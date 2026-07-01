@@ -1,7 +1,20 @@
 {
   "initialOdo": 85770.7,
-  "rides": [],
-  "petrols": [],
+  "rides": [
+    {
+      "date": "2026-07-01",
+      "time": "09:05",
+      "odo": 85796
+    }
+  ],
+  "petrols": [
+    {
+      "date": "2026-07-01",
+      "amount": 330,
+      "price": 115.8,
+      "litres": 2.85
+    }
+  ],
   "oilChanges": [],
   "tyreChecks": [],
   "services": []
