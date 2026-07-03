@@ -1,777 +1,1259 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bike Tracker</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-  :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --surface2: #222222;
-    --surface3: #2a2a2a;
-    --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.14);
-    --text: #f0ede8;
-    --text2: #9e9b96;
-    --text3: #5e5c58;
-    --accent: #e86c2f;
-    --accent-dim: rgba(232,108,47,0.12);
-    --accent-border: rgba(232,108,47,0.3);
-    --green: #3dba7e;
-    --green-dim: rgba(61,186,126,0.1);
-    --blue: #4a9eff;
-    --blue-dim: rgba(74,158,255,0.1);
-    --yellow: #f0b429;
-    --yellow-dim: rgba(240,180,41,0.1);
-    --red: #e05252;
-    --red-dim: rgba(224,82,82,0.1);
-    --radius: 10px;
-    --radius-lg: 14px;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  /* ── Layout ── */
-  .app { display: flex; min-height: 100vh; }
-
-  .sidebar {
-    width: 220px;
-    min-width: 220px;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 1.5rem 0;
-    position: fixed;
-    top: 0; left: 0; bottom: 0;
-    z-index: 10;
-  }
-
-  .logo {
-    padding: 0 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1rem;
-  }
-  .logo-name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
-  .logo-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-
-  .nav-group { margin-bottom: 0.25rem; }
-  .nav-label { font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; padding: 0.5rem 1.25rem 0.25rem; }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 1.25rem;
-    cursor: pointer;
-    color: var(--text2);
-    font-size: 13px;
-    border-left: 2px solid transparent;
-    transition: all 0.15s;
-    user-select: none;
-  }
-  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); font-weight: 500; }
-  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
-
-  .sidebar-footer {
-    margin-top: auto;
-    padding: 1rem 1.25rem 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .main {
-    margin-left: 220px;
-    flex: 1;
-    padding: 2rem;
-    max-width: 900px;
-  }
-
-  /* ── Panel ── */
-  .panel { display: none; }
-  .panel.active { display: block; }
-
-  .page-header { margin-bottom: 1.75rem; }
-  .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; }
-  .page-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
-
-  /* ── Cards ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem;
-  }
-  .card-title {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text3);
-    margin-bottom: 1rem;
-  }
-
-  /* ── Dashboard circles ── */
-  .dash-circles { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-  .big-ring {
-    flex: 1; min-width: 180px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-  .ring-wrap { position: relative; width: 100px; height: 100px; }
-  .ring-wrap svg { position: absolute; top:0; left:0; transform: rotate(-90deg); }
-  .ring-wrap .ring-inner {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-  }
-  .ring-val { font-size: 20px; font-weight: 600; letter-spacing: -0.03em; }
-  .ring-unit { font-size: 10px; color: var(--text3); }
-  .ring-label { font-size: 12px; color: var(--text2); text-align: center; }
-
-  .small-rings { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-  .small-card {
-    flex: 1; min-width: 110px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem;
-    display: flex; flex-direction: column; gap: 4px;
-  }
-  .small-card .sc-val { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-  .small-card .sc-lbl { font-size: 11px; color: var(--text2); }
-
-  .month-row {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem;
-  }
-  .month-row select {
-    background: var(--surface2); border: 1px solid var(--border2);
-    color: var(--text); border-radius: var(--radius); padding: 6px 10px;
-    font-size: 13px; font-family: inherit; cursor: pointer;
-  }
-
-  /* ── Forms ── */
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-  .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
-  .form-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
-
-  .fg { margin-bottom: 0.75rem; }
-  .fg label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
-  .fg input, .fg select, .fg textarea {
-    width: 100%; padding: 8px 10px;
-    background: var(--surface2); border: 1px solid var(--border2);
-    border-radius: var(--radius); color: var(--text);
-    font-family: inherit; font-size: 13px;
-  }
-  .fg input:focus, .fg select:focus, .fg textarea:focus {
-    outline: none; border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-dim);
-  }
-  .fg textarea { resize: vertical; min-height: 72px; }
-  .fg .hint { font-size: 11px; color: var(--text3); margin-top: 3px; }
-
-  /* ── Buttons ── */
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 14px; border-radius: var(--radius);
-    border: 1px solid var(--border2); background: var(--surface2);
-    color: var(--text); font-family: inherit; font-size: 13px;
-    cursor: pointer; font-weight: 500; transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .btn:hover { background: var(--surface3); border-color: rgba(255,255,255,0.2); }
-  .btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn-accent:hover { background: #d45e24; border-color: #d45e24; }
-  .btn-full { width: 100%; justify-content: center; }
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
-  .btn-ghost { background: transparent; border-color: transparent; color: var(--text2); }
-  .btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
-
-  /* ── Tables ── */
-  .tbl-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  td:first-child, td.primary { color: var(--text); }
-  tr:hover td { background: rgba(255,255,255,0.02); }
-
-  /* ── Badges ── */
-  .badge {
-    display: inline-block; font-size: 10px; font-weight: 600;
-    padding: 2px 8px; border-radius: 20px; letter-spacing: 0.03em;
-  }
-  .badge-ride { background: var(--blue-dim); color: var(--blue); }
-  .badge-petrol { background: var(--yellow-dim); color: var(--yellow); }
-  .badge-oil { background: rgba(232,108,47,0.15); color: var(--accent); }
-  .badge-service { background: var(--green-dim); color: var(--green); }
-  .badge-tyre { background: rgba(255,255,255,0.07); color: var(--text2); }
-  .badge-warn { background: var(--red-dim); color: var(--red); }
-
-  /* ── Oil reminder banner ── */
-  .oil-banner {
-    display: flex; align-items: center; gap: 12px;
-    padding: 1rem 1.25rem;
-    border-radius: var(--radius-lg);
-    border: 1px solid;
-    margin-bottom: 1.5rem;
-  }
-  .oil-banner.ok { border-color: var(--green-dim); background: var(--green-dim); }
-  .oil-banner.warn { border-color: rgba(240,180,41,0.25); background: rgba(240,180,41,0.08); }
-  .oil-banner.due { border-color: rgba(224,82,82,0.3); background: var(--red-dim); }
-  .oil-banner .oil-icon { font-size: 24px; }
-  .oil-banner .oil-text { flex: 1; }
-  .oil-banner .oil-title { font-weight: 600; font-size: 14px; }
-  .oil-banner .oil-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .oil-progress { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-  .oil-bar { height: 100%; border-radius: 2px; transition: width 0.6s; }
-
-  /* ── Charts ── */
-  .chart-wrap { position: relative; width: 100%; }
-  .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-
-  /* ── Tyre section ── */
-  .tyre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  .tyre-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem;
-  }
-  .tyre-icon { font-size: 32px; margin-bottom: 8px; }
-  .tyre-label { font-size: 13px; font-weight: 600; }
-  .tyre-date { font-size: 12px; color: var(--text2); margin-top: 4px; }
-  .tyre-note { font-size: 11px; color: var(--text3); margin-top: 3px; }
-
-  /* ── Service ── */
-  .service-item {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .service-item:last-child { border-bottom: none; }
-  .service-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-top: 5px; flex-shrink: 0; }
-  .service-dot.old { background: var(--text3); }
-  .service-info { flex: 1; }
-  .service-title { font-size: 13px; font-weight: 500; }
-  .service-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .service-desc { font-size: 12px; color: var(--text3); margin-top: 3px; }
-
-  /* ── Overall stats ── */
-  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
-  .stat-tile {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 1rem;
-  }
-  .stat-tile .num { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; }
-  .stat-tile .desc { font-size: 11px; color: var(--text2); margin-top: 3px; }
-
-  /* ── Empty states ── */
-  .empty { text-align: center; padding: 2.5rem; color: var(--text3); font-size: 13px; }
-  .empty .e-icon { font-size: 32px; margin-bottom: 8px; }
-
-  /* ── Delete btn ── */
-  .del-btn { background: none; border: none; padding: 4px 8px; border-radius: 6px; color: var(--text3); cursor: pointer; font-size: 13px; }
-  .del-btn:hover { background: var(--red-dim); color: var(--red); }
-
-  /* ── Toast ── */
-  .toast {
-    position: fixed; bottom: 1.5rem; right: 1.5rem;
-    background: var(--surface3); border: 1px solid var(--border2);
-    color: var(--text); padding: 10px 16px; border-radius: var(--radius);
-    font-size: 13px; opacity: 0; pointer-events: none;
-    transition: opacity 0.2s; z-index: 9999;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-  }
-  .toast.show { opacity: 1; }
-
-  /* ── Divider ── */
-  .divider { height: 1px; background: var(--border); margin: 1.25rem 0; }
-
-  /* ── Responsive ── */
-  @media (max-width: 700px) {
-    .sidebar { display: none; }
-    .main { margin-left: 0; padding: 1rem; }
-    .stats-row { grid-template-columns: 1fr 1fr; }
-    .form-grid { grid-template-columns: 1fr; }
-    .tyre-grid { grid-template-columns: 1fr; }
-  }
-
-  .sep { color: var(--text3); margin: 0 4px; }
-
-  input[type="date"], input[type="time"] {
-    color-scheme: dark;
-  }
-</style>
-</head>
-<body>
-<div class="app">
-
-  <!-- SIDEBAR -->
-  <nav class="sidebar">
-    <div class="logo">
-      <div class="logo-name">🏍️ BikeLog</div>
-      <div class="logo-sub" id="sidebar-odo">Loading…</div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Dashboard</div>
-      <div class="nav-item active" onclick="nav('dashboard', this)">
-        <span class="icon">📊</span> Monthly
-      </div>
-      <div class="nav-item" onclick="nav('overall', this)">
-        <span class="icon">📈</span> Overall
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Track</div>
-      <div class="nav-item" onclick="nav('rides', this)">
-        <span class="icon">🛣️</span> Ride History
-      </div>
-      <div class="nav-item" onclick="nav('petrol', this)">
-        <span class="icon">⛽</span> Petrol
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Maintenance</div>
-      <div class="nav-item" onclick="nav('oil', this)">
-        <span class="icon">🔧</span> Engine Oil
-      </div>
-      <div class="nav-item" onclick="nav('tyre', this)">
-        <span class="icon">🔵</span> Tyre Pressure
-      </div>
-      <div class="nav-item" onclick="nav('service', this)">
-        <span class="icon">🛠️</span> Service History
-      </div>
-    </div>
-
-    <div class="sidebar-footer">
-      <button class="btn btn-full" onclick="exportData()" style="justify-content:center">⬇ Export JSON</button>
-    </div>
-  </nav>
-
-  <!-- MAIN -->
-  <main class="main">
-
-    <!-- ══ DASHBOARD ══ -->
-    <div class="panel active" id="panel-dashboard">
-      <div class="page-header">
-        <div class="page-title">Monthly Overview</div>
-        <div class="page-sub" id="dash-sub">Your riding stats for this month</div>
-      </div>
-
-      <div id="oil-banner-dash"></div>
-
-      <div class="month-row">
-        <span style="font-size:13px;color:var(--text2)">Month</span>
-        <select id="monthSelector" onchange="renderDashboard()"></select>
-      </div>
-
-      <div class="dash-circles">
-        <div class="big-ring">
-          <div class="ring-wrap">
-            <svg width="100" height="100" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
-              <circle id="ring-km-arc" cx="50" cy="50" r="42" fill="none" stroke="#4a9eff" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 264"/>
-            </svg>
-            <div class="ring-inner">
-              <div class="ring-val" id="mon-km" style="color:var(--blue)">0</div>
-              <div class="ring-unit">km</div>
-            </div>
-          </div>
-          <div class="ring-label">Driven this month</div>
-        </div>
-        <div class="big-ring">
-          <div class="ring-wrap">
-            <svg width="100" height="100" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
-              <circle id="ring-petrol-arc" cx="50" cy="50" r="42" fill="none" stroke="#f0b429" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 264"/>
-            </svg>
-            <div class="ring-inner">
-              <div class="ring-val" id="mon-litres" style="color:var(--yellow)">0</div>
-              <div class="ring-unit">litres</div>
-            </div>
-          </div>
-          <div class="ring-label">Petrol this month</div>
-        </div>
-      </div>
-
-      <div class="small-rings">
-        <div class="small-card">
-          <div class="sc-val" id="mon-avg" style="color:var(--green)">—</div>
-          <div class="sc-lbl">km / litre avg</div>
-        </div>
-        <div class="small-card">
-          <div class="sc-val" id="mon-spend">₹0</div>
-          <div class="sc-lbl">petrol spend</div>
-        </div>
-        <div class="small-card">
-          <div class="sc-val" id="mon-days">0</div>
-          <div class="sc-lbl">riding days</div>
-        </div>
-        <div class="small-card">
-          <div class="sc-val" id="mon-rides">0</div>
-          <div class="sc-lbl">total rides</div>
-        </div>
-        <div class="small-card">
-          <div class="sc-val" id="total-odo">0</div>
-          <div class="sc-lbl">odometer (km)</div>
-        </div>
-      </div>
-
-      <!-- Quick add forms -->
-      <div class="form-grid">
-        <div class="form-card">
-          <h3>🛣️ Log a ride</h3>
-          <div class="fg"><label>Date</label><input type="date" id="ride-date"></div>
-          <div class="fg"><label>Time</label><input type="time" id="ride-time"></div>
-          <div class="fg">
-            <label>Odometer reading (km)</label>
-            <input type="number" id="ride-odo" placeholder="e.g. 12540" oninput="updateRideHint()">
-            <div class="hint" id="ride-hint"></div>
-          </div>
-          <button class="btn btn-accent btn-full" onclick="addRide()">Add ride</button>
-        </div>
-
-        <div class="form-card">
-          <h3>⛽ Log petrol</h3>
-          <div class="fg"><label>Date</label><input type="date" id="petrol-date"></div>
-          <div class="fg"><label>Amount paid (₹)</label><input type="number" id="petrol-amount" placeholder="e.g. 330" oninput="updatePetrolHint()"></div>
-          <div class="fg">
-            <label>Price per litre (₹/L)</label>
-            <input type="number" id="petrol-price" placeholder="e.g. 115.8" step="0.1" oninput="updatePetrolHint()">
-            <div class="hint" id="petrol-calc-hint"></div>
-          </div>
-          <button class="btn btn-accent btn-full" onclick="addPetrol()">Add petrol</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ OVERALL ══ -->
-    <div class="panel" id="panel-overall">
-      <div class="page-header">
-        <div class="page-title">Overall Stats</div>
-        <div class="page-sub">All-time performance across every month</div>
-      </div>
-      <div class="stats-row">
-        <div class="stat-tile"><div class="num" id="ov-km">0 km</div><div class="desc">total km tracked</div></div>
-        <div class="stat-tile"><div class="num" id="ov-litres">0 L</div><div class="desc">total petrol used</div></div>
-        <div class="stat-tile"><div class="num" id="ov-spend">₹0</div><div class="desc">total petrol cost</div></div>
-        <div class="stat-tile"><div class="num" id="ov-avg">—</div><div class="desc">overall km/litre</div></div>
-      </div>
-      <div class="charts-grid">
-        <div class="card">
-          <div class="card-title">Km driven per month</div>
-          <div class="chart-wrap" style="height:200px"><canvas id="chart-km" role="img" aria-label="Monthly km driven bar chart">Monthly km data.</canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">Petrol consumed per month (litres)</div>
-          <div class="chart-wrap" style="height:200px"><canvas id="chart-petrol" role="img" aria-label="Monthly petrol chart">Monthly petrol data.</canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">Petrol spend per month (₹)</div>
-          <div class="chart-wrap" style="height:200px"><canvas id="chart-spend" role="img" aria-label="Monthly spend chart">Monthly spend data.</canvas></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ RIDES ══ -->
-    <div class="panel" id="panel-rides">
-      <div class="page-header">
-        <div class="page-title">Ride History</div>
-        <div class="page-sub">Every ride logged with date, time, and distance</div>
-      </div>
-      <div class="card">
-        <div id="rides-table"></div>
-      </div>
-    </div>
-
-    <!-- ══ PETROL ══ -->
-    <div class="panel" id="panel-petrol">
-      <div class="page-header">
-        <div class="page-title">Petrol Log</div>
-        <div class="page-sub">All fill-ups with litres, cost, and price per litre</div>
-      </div>
-      <div class="card">
-        <div id="petrol-table"></div>
-      </div>
-    </div>
-
-    <!-- ══ ENGINE OIL ══ -->
-    <div class="panel" id="panel-oil">
-      <div class="page-header">
-        <div class="page-title">Engine Oil</div>
-        <div class="page-sub">Change reminder every 2,000 km</div>
-      </div>
-
-      <div id="oil-banner-main"></div>
-
-      <div class="form-card" style="margin-bottom:1.5rem">
-        <h3>🔧 Record an oil change</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-          <div class="fg"><label>Date</label><input type="date" id="oil-date"></div>
-          <div class="fg">
-            <label>Odometer at change (km)</label>
-            <input type="number" id="oil-odo" placeholder="e.g. 12540">
-          </div>
-        </div>
-        <div class="fg"><label>Notes (oil type, brand, etc.)</label><input type="text" id="oil-notes" placeholder="e.g. Motul 10W-30 semi-synthetic"></div>
-        <button class="btn btn-accent" onclick="addOilChange()">Save oil change</button>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Oil change history</div>
-        <div id="oil-table"></div>
-      </div>
-    </div>
-
-    <!-- ══ TYRE ══ -->
-    <div class="panel" id="panel-tyre">
-      <div class="page-header">
-        <div class="page-title">Tyre Pressure</div>
-        <div class="page-sub">Log when you last checked and filled each tyre</div>
-      </div>
-
-      <div class="tyre-grid" style="margin-bottom:1.5rem">
-        <div class="tyre-card">
-          <div class="tyre-icon">⬆️</div>
-          <div class="tyre-label">Front Tyre</div>
-          <div class="tyre-date" id="tyre-front-date">Never recorded</div>
-          <div class="tyre-note" id="tyre-front-note"></div>
-        </div>
-        <div class="tyre-card">
-          <div class="tyre-icon">⬇️</div>
-          <div class="tyre-label">Rear Tyre</div>
-          <div class="tyre-date" id="tyre-rear-date">Never recorded</div>
-          <div class="tyre-note" id="tyre-rear-note"></div>
-        </div>
-      </div>
-
-      <div class="form-card" style="margin-bottom:1.5rem">
-        <h3>🔵 Record pressure check</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
-          <div class="fg"><label>Date</label><input type="date" id="tyre-date"></div>
-          <div class="fg">
-            <label>Tyre</label>
-            <select id="tyre-which" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:13px">
-              <option value="front">Front</option>
-              <option value="rear">Rear</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div class="fg"><label>Pressure (PSI)</label><input type="number" id="tyre-psi" placeholder="e.g. 32"></div>
-        </div>
-        <div class="fg"><label>Notes</label><input type="text" id="tyre-notes" placeholder="e.g. Filled at petrol station"></div>
-        <button class="btn btn-accent" onclick="addTyreCheck()">Save</button>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Pressure log</div>
-        <div id="tyre-table"></div>
-      </div>
-    </div>
-
-    <!-- ══ SERVICE ══ -->
-    <div class="panel" id="panel-service">
-      <div class="page-header">
-        <div class="page-title">Service History</div>
-        <div class="page-sub">Full maintenance record for your bike</div>
-      </div>
-
-      <div class="form-card" style="margin-bottom:1.5rem">
-        <h3>🛠️ Add service record</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
-          <div class="fg"><label>Date</label><input type="date" id="svc-date"></div>
-          <div class="fg"><label>Odometer (km)</label><input type="number" id="svc-odo" placeholder="e.g. 12540"></div>
-          <div class="fg"><label>Cost (₹)</label><input type="number" id="svc-cost" placeholder="e.g. 850"></div>
-        </div>
-        <div class="fg"><label>Service type / title</label><input type="text" id="svc-title" placeholder="e.g. Full service, chain lube, brake pad replace…"></div>
-        <div class="fg"><label>Details / notes</label><textarea id="svc-notes" placeholder="What was done, parts replaced, mechanic name, etc."></textarea></div>
-        <div class="fg"><label>Workshop / garage</label><input type="text" id="svc-shop" placeholder="e.g. Royal Service Center, Hyderabad"></div>
-        <button class="btn btn-accent" onclick="addService()">Save service record</button>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Service records</div>
-        <div id="service-list"></div>
-      </div>
-    </div>
-
-  </main>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-// ═══════════════════════════════════
-//  DATA MODEL
-// ═══════════════════════════════════
-let data = {
-  initialOdo: 0,
-  rides: [],       // { date, time, odo }
-  petrols: [],     // { date, amount, price, litres }
-  oilChanges: [],  // { date, odo, notes }
-  tyreChecks: [],  // { date, tyre, psi, notes }
-  services: []     // { date, odo, cost, title, notes, shop }
-};
-
-let chartKm = null, chartPetrol = null, chartSpend = null;
-
-// ─── Persistence ───
-function saveLocal() {
-  try { localStorage.setItem('biketracker_v2', JSON.stringify(data)); } catch(e) {}
-}
-function loadLocal() {
-  try {
-    const s = localStorage.getItem('biketracker_v2');
-    if (s) data = { ...data, ...JSON.parse(s) };
-  } catch(e) {}
-}
-
-// ─── Fetch from repo (GitHub Pages) ───
-async function fetchRepoData() {
-  try {
-    const res = await fetch('./bike-data.json?t=' + Date.now());
-    if (!res.ok) return false;
-    const imported = await res.json();
-    if (imported && (imported.rides || imported.petrols || imported.initialOdo !== undefined)) {
-      data = { ...data, ...imported };
-      saveLocal();
-      return true;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bike Tracker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #222222;
+      --surface3: #2a2a2a;
+      --border: rgba(255, 255, 255, 0.08);
+      --border2: rgba(255, 255, 255, 0.14);
+      --text: #f0ede8;
+      --text2: #9e9b96;
+      --text3: #5e5c58;
+      --accent: #e86c2f;
+      --accent-dim: rgba(232, 108, 47, 0.12);
+      --accent-border: rgba(232, 108, 47, 0.3);
+      --green: #3dba7e;
+      --green-dim: rgba(61, 186, 126, 0.1);
+      --blue: #4a9eff;
+      --blue-dim: rgba(74, 158, 255, 0.1);
+      --yellow: #f0b429;
+      --yellow-dim: rgba(240, 180, 41, 0.1);
+      --red: #e05252;
+      --red-dim: rgba(224, 82, 82, 0.1);
+      --radius: 10px;
+      --radius-lg: 14px;
     }
-  } catch(e) {}
-  return false;
-}
 
-// ─── Toast ───
-function toast(msg, dur=2400) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), dur);
-}
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-// ─── Navigation ───
-function nav(id, el) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('panel-' + id).classList.add('active');
-  el.classList.add('active');
-  if (id === 'dashboard') renderDashboard();
-  if (id === 'overall') renderOverall();
-  if (id === 'rides') renderRides();
-  if (id === 'petrol') renderPetrolLog();
-  if (id === 'oil') renderOil();
-  if (id === 'tyre') renderTyre();
-  if (id === 'service') renderService();
-}
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
 
-// ═══════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════
-function getTotalOdo() {
-  if (!data.rides.length) return data.initialOdo || 0;
-  return Math.max(...data.rides.map(r => r.odo));
-}
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
 
-function getAllMonths() {
-  const months = new Set();
-  const now = new Date();
-  months.add(now.toISOString().slice(0,7));
-  data.rides.forEach(r => months.add(r.date.slice(0,7)));
-  data.petrols.forEach(p => months.add(p.date.slice(0,7)));
-  return [...months].sort().reverse();
-}
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 10;
+    }
 
-function getMonthKm(month) {
-  const monthRides = data.rides
-    .filter(r => r.date.startsWith(month))
-    .sort((a,b) => new Date(a.date+' '+a.time) - new Date(b.date+' '+b.time) || a.odo - b.odo);
-  if (!monthRides.length) return 0;
-  const allSorted = [...data.rides].sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time) || a.odo - b.odo);
-  let total = 0;
-  monthRides.forEach(ride => {
-    const idx = allSorted.indexOf(ride);
-    const prev = idx > 0 ? allSorted[idx-1].odo : (data.initialOdo || 0);
-    total += Math.max(0, ride.odo - prev);
-  });
-  return Math.round(total);
-}
+    .logo {
+      padding: 0 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
 
-function getMonthLitres(month) {
-  return data.petrols.filter(p => p.date.startsWith(month)).reduce((s,p) => s + p.litres, 0);
-}
+    .logo-name {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
 
-function getMonthSpend(month) {
-  return data.petrols.filter(p => p.date.startsWith(month)).reduce((s,p) => s + p.amount, 0);
-}
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 2px;
+    }
 
-function fmtDate(d) {
-  if (!d) return '—';
-  const [y,m,day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
+    .nav-group {
+      margin-bottom: 0.25rem;
+    }
 
-// ═══════════════════════════════════
-//  OIL BANNER
-// ═══════════════════════════════════
-function renderOilBanner(containerId) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  const OIL_INTERVAL = 2000;
-  const currentOdo = getTotalOdo();
+    .nav-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.5rem 1.25rem 0.25rem;
+    }
 
-  if (!data.oilChanges.length) {
-    el.innerHTML = `<div class="oil-banner warn">
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 1.25rem;
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .nav-item:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-dim);
+      font-weight: 500;
+    }
+
+    .nav-item .icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 1rem 1.25rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      padding: 2rem;
+      max-width: 900px;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .page-header {
+      margin-bottom: 1.75rem;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+
+    .page-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-top: 4px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text3);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Dashboard circles ── */
+    .dash-circles {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .big-ring {
+      flex: 1;
+      min-width: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ring-wrap {
+      position: relative;
+      width: 100px;
+      height: 100px;
+    }
+
+    .ring-wrap svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: rotate(-90deg);
+    }
+
+    .ring-wrap .ring-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ring-val {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+
+    .ring-unit {
+      font-size: 10px;
+      color: var(--text3);
+    }
+
+    .ring-label {
+      font-size: 12px;
+      color: var(--text2);
+      text-align: center;
+    }
+
+    .small-rings {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .small-card {
+      flex: 1;
+      min-width: 110px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .small-card .sc-val {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .small-card .sc-lbl {
+      font-size: 11px;
+      color: var(--text2);
+    }
+
+    .month-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+
+    .month-row select {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* ── Forms ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+    }
+
+    .form-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .fg {
+      margin-bottom: 0.75rem;
+    }
+
+    .fg label {
+      display: block;
+      font-size: 11px;
+      color: var(--text2);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .fg input,
+    .fg select,
+    .fg textarea {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    .fg input:focus,
+    .fg select:focus,
+    .fg textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    .fg textarea {
+      resize: vertical;
+      min-height: 72px;
+    }
+
+    .fg .hint {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 3px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--surface3);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-accent:hover {
+      background: #d45e24;
+      border-color: #d45e24;
+    }
+
+    .btn-full {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--text2);
+    }
+
+    .btn-ghost:hover {
+      background: var(--surface2);
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    /* ── Tables ── */
+    .tbl-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    td:first-child,
+    td.primary {
+      color: var(--text);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-ride {
+      background: var(--blue-dim);
+      color: var(--blue);
+    }
+
+    .badge-petrol {
+      background: var(--yellow-dim);
+      color: var(--yellow);
+    }
+
+    .badge-oil {
+      background: rgba(232, 108, 47, 0.15);
+      color: var(--accent);
+    }
+
+    .badge-service {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .badge-tyre {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text2);
+    }
+
+    .badge-warn {
+      background: var(--red-dim);
+      color: var(--red);
+    }
+
+    /* ── Oil reminder banner ── */
+    .oil-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid;
+      margin-bottom: 1.5rem;
+    }
+
+    .oil-banner.ok {
+      border-color: var(--green-dim);
+      background: var(--green-dim);
+    }
+
+    .oil-banner.warn {
+      border-color: rgba(240, 180, 41, 0.25);
+      background: rgba(240, 180, 41, 0.08);
+    }
+
+    .oil-banner.due {
+      border-color: rgba(224, 82, 82, 0.3);
+      background: var(--red-dim);
+    }
+
+    .oil-banner .oil-icon {
+      font-size: 24px;
+    }
+
+    .oil-banner .oil-text {
+      flex: 1;
+    }
+
+    .oil-banner .oil-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .oil-banner .oil-sub {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
+    .oil-progress {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .oil-bar {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.6s;
+    }
+
+    /* ── Charts ── */
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    /* ── Tyre section ── */
+    .tyre-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .tyre-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+    }
+
+    .tyre-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .tyre-label {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .tyre-date {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 4px;
+    }
+
+    .tyre-note {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 3px;
+    }
+
+    /* ── Service ── */
+    .service-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .service-item:last-child {
+      border-bottom: none;
+    }
+
+    .service-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+
+    .service-dot.old {
+      background: var(--text3);
+    }
+
+    .service-info {
+      flex: 1;
+    }
+
+    .service-title {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .service-meta {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
+    .service-desc {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 3px;
+    }
+
+    /* ── Overall stats ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+
+    .stat-tile .num {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+
+    .stat-tile .desc {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 3px;
+    }
+
+    /* ── Empty states ── */
+    .empty {
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--text3);
+      font-size: 13px;
+    }
+
+    .empty .e-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Delete btn ── */
+    .del-btn {
+      background: none;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 6px;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .del-btn:hover {
+      background: var(--red-dim);
+      color: var(--red);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--surface3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 9999;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 1.25rem 0;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .sidebar {
+        display: none;
+      }
+
+      .main {
+        margin-left: 0;
+        padding: 1rem;
+      }
+
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tyre-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sep {
+      color: var(--text3);
+      margin: 0 4px;
+    }
+
+    input[type="date"],
+    input[type="time"] {
+      color-scheme: dark;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+      <div class="logo">
+        <div class="logo-name">🏍️ BikeLog</div>
+        <div class="logo-sub" id="sidebar-odo">Loading…</div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Dashboard</div>
+        <div class="nav-item active" onclick="nav('dashboard', this)">
+          <span class="icon">📊</span> Monthly
+        </div>
+        <div class="nav-item" onclick="nav('overall', this)">
+          <span class="icon">📈</span> Overall
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Track</div>
+        <div class="nav-item" onclick="nav('rides', this)">
+          <span class="icon">🛣️</span> Ride History
+        </div>
+        <div class="nav-item" onclick="nav('petrol', this)">
+          <span class="icon">⛽</span> Petrol
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Maintenance</div>
+        <div class="nav-item" onclick="nav('oil', this)">
+          <span class="icon">🔧</span> Engine Oil
+        </div>
+        <div class="nav-item" onclick="nav('tyre', this)">
+          <span class="icon">🔵</span> Tyre Pressure
+        </div>
+        <div class="nav-item" onclick="nav('service', this)">
+          <span class="icon">🛠️</span> Service History
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-full" onclick="exportData()" style="justify-content:center">⬇ Export JSON</button>
+      </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="panel active" id="panel-dashboard">
+        <div class="page-header">
+          <div class="page-title">Monthly Overview</div>
+          <div class="page-sub" id="dash-sub">Your riding stats for this month</div>
+        </div>
+
+        <div id="oil-banner-dash"></div>
+
+        <div class="month-row">
+          <span style="font-size:13px;color:var(--text2)">Month</span>
+          <select id="monthSelector" onchange="renderDashboard()"></select>
+        </div>
+
+        <div class="dash-circles">
+          <div class="big-ring">
+            <div class="ring-wrap">
+              <svg width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" />
+                <circle id="ring-km-arc" cx="50" cy="50" r="42" fill="none" stroke="#4a9eff" stroke-width="8"
+                  stroke-linecap="round" stroke-dasharray="0 264" />
+              </svg>
+              <div class="ring-inner">
+                <div class="ring-val" id="mon-km" style="color:var(--blue)">0</div>
+                <div class="ring-unit">km</div>
+              </div>
+            </div>
+            <div class="ring-label">Driven this month</div>
+          </div>
+          <div class="big-ring">
+            <div class="ring-wrap">
+              <svg width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" />
+                <circle id="ring-petrol-arc" cx="50" cy="50" r="42" fill="none" stroke="#f0b429" stroke-width="8"
+                  stroke-linecap="round" stroke-dasharray="0 264" />
+              </svg>
+              <div class="ring-inner">
+                <div class="ring-val" id="mon-litres" style="color:var(--yellow)">0</div>
+                <div class="ring-unit">litres</div>
+              </div>
+            </div>
+            <div class="ring-label">Petrol this month</div>
+          </div>
+        </div>
+
+        <div class="small-rings">
+          <div class="small-card">
+            <div class="sc-val" id="mon-avg" style="color:var(--green)">—</div>
+            <div class="sc-lbl">km / litre avg</div>
+          </div>
+          <div class="small-card">
+            <div class="sc-val" id="mon-spend">₹0</div>
+            <div class="sc-lbl">petrol spend</div>
+          </div>
+          <div class="small-card">
+            <div class="sc-val" id="mon-days">0</div>
+            <div class="sc-lbl">riding days</div>
+          </div>
+          <div class="small-card">
+            <div class="sc-val" id="mon-rides">0</div>
+            <div class="sc-lbl">total rides</div>
+          </div>
+          <div class="small-card">
+            <div class="sc-val" id="total-odo">0</div>
+            <div class="sc-lbl">odometer (km)</div>
+          </div>
+        </div>
+
+        <!-- Quick add forms -->
+        <div class="form-grid">
+          <div class="form-card">
+            <h3>🛣️ Log a ride</h3>
+            <div class="fg"><label>Date</label><input type="date" id="ride-date"></div>
+            <div class="fg"><label>Time</label><input type="time" id="ride-time"></div>
+            <div class="fg">
+              <label>Odometer reading (km)</label>
+              <input type="number" id="ride-odo" placeholder="e.g. 12540" oninput="updateRideHint()">
+              <div class="hint" id="ride-hint"></div>
+            </div>
+            <button class="btn btn-accent btn-full" onclick="addRide()">Add ride</button>
+          </div>
+
+          <div class="form-card">
+            <h3>⛽ Log petrol</h3>
+            <div class="fg"><label>Date</label><input type="date" id="petrol-date"></div>
+            <div class="fg"><label>Amount paid (₹)</label><input type="number" id="petrol-amount" placeholder="e.g. 330"
+                oninput="updatePetrolHint()"></div>
+            <div class="fg">
+              <label>Price per litre (₹/L)</label>
+              <input type="number" id="petrol-price" placeholder="e.g. 115.8" step="0.1" oninput="updatePetrolHint()">
+              <div class="hint" id="petrol-calc-hint"></div>
+            </div>
+            <button class="btn btn-accent btn-full" onclick="addPetrol()">Add petrol</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ OVERALL ══ -->
+      <div class="panel" id="panel-overall">
+        <div class="page-header">
+          <div class="page-title">Overall Stats</div>
+          <div class="page-sub">All-time performance across every month</div>
+        </div>
+        <div class="stats-row">
+          <div class="stat-tile">
+            <div class="num" id="ov-km">0 km</div>
+            <div class="desc">total km tracked</div>
+          </div>
+          <div class="stat-tile">
+            <div class="num" id="ov-litres">0 L</div>
+            <div class="desc">total petrol used</div>
+          </div>
+          <div class="stat-tile">
+            <div class="num" id="ov-spend">₹0</div>
+            <div class="desc">total petrol cost</div>
+          </div>
+          <div class="stat-tile">
+            <div class="num" id="ov-avg">—</div>
+            <div class="desc">overall km/litre</div>
+          </div>
+        </div>
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-title">Km driven per month</div>
+            <div class="chart-wrap" style="height:200px"><canvas id="chart-km" role="img"
+                aria-label="Monthly km driven bar chart">Monthly km data.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Petrol consumed per month (litres)</div>
+            <div class="chart-wrap" style="height:200px"><canvas id="chart-petrol" role="img"
+                aria-label="Monthly petrol chart">Monthly petrol data.</canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Petrol spend per month (₹)</div>
+            <div class="chart-wrap" style="height:200px"><canvas id="chart-spend" role="img"
+                aria-label="Monthly spend chart">Monthly spend data.</canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ RIDES ══ -->
+      <div class="panel" id="panel-rides">
+        <div class="page-header">
+          <div class="page-title">Ride History</div>
+          <div class="page-sub">Every ride logged with date, time, and distance</div>
+        </div>
+        <div class="card">
+          <div id="rides-table"></div>
+        </div>
+      </div>
+
+      <!-- ══ PETROL ══ -->
+      <div class="panel" id="panel-petrol">
+        <div class="page-header">
+          <div class="page-title">Petrol Log</div>
+          <div class="page-sub">All fill-ups with litres, cost, and price per litre</div>
+        </div>
+        <div class="card">
+          <div id="petrol-table"></div>
+        </div>
+      </div>
+
+      <!-- ══ ENGINE OIL ══ -->
+      <div class="panel" id="panel-oil">
+        <div class="page-header">
+          <div class="page-title">Engine Oil</div>
+          <div class="page-sub">Change reminder every 2,000 km</div>
+        </div>
+
+        <div id="oil-banner-main"></div>
+
+        <div class="form-card" style="margin-bottom:1.5rem">
+          <h3>🔧 Record an oil change</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="fg"><label>Date</label><input type="date" id="oil-date"></div>
+            <div class="fg">
+              <label>Odometer at change (km)</label>
+              <input type="number" id="oil-odo" placeholder="e.g. 12540">
+            </div>
+          </div>
+          <div class="fg"><label>Notes (oil type, brand, etc.)</label><input type="text" id="oil-notes"
+              placeholder="e.g. Motul 10W-30 semi-synthetic"></div>
+          <button class="btn btn-accent" onclick="addOilChange()">Save oil change</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Oil change history</div>
+          <div id="oil-table"></div>
+        </div>
+      </div>
+
+      <!-- ══ TYRE ══ -->
+      <div class="panel" id="panel-tyre">
+        <div class="page-header">
+          <div class="page-title">Tyre Pressure</div>
+          <div class="page-sub">Log when you last checked and filled each tyre</div>
+        </div>
+
+        <div class="tyre-grid" style="margin-bottom:1.5rem">
+          <div class="tyre-card">
+            <div class="tyre-icon">⬆️</div>
+            <div class="tyre-label">Front Tyre</div>
+            <div class="tyre-date" id="tyre-front-date">Never recorded</div>
+            <div class="tyre-note" id="tyre-front-note"></div>
+          </div>
+          <div class="tyre-card">
+            <div class="tyre-icon">⬇️</div>
+            <div class="tyre-label">Rear Tyre</div>
+            <div class="tyre-date" id="tyre-rear-date">Never recorded</div>
+            <div class="tyre-note" id="tyre-rear-note"></div>
+          </div>
+        </div>
+
+        <div class="form-card" style="margin-bottom:1.5rem">
+          <h3>🔵 Record pressure check</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+            <div class="fg"><label>Date</label><input type="date" id="tyre-date"></div>
+            <div class="fg">
+              <label>Tyre</label>
+              <select id="tyre-which"
+                style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:13px">
+                <option value="front">Front</option>
+                <option value="rear">Rear</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
+            <div class="fg"><label>Pressure (PSI)</label><input type="number" id="tyre-psi" placeholder="e.g. 32"></div>
+          </div>
+          <div class="fg"><label>Notes</label><input type="text" id="tyre-notes"
+              placeholder="e.g. Filled at petrol station"></div>
+          <button class="btn btn-accent" onclick="addTyreCheck()">Save</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Pressure log</div>
+          <div id="tyre-table"></div>
+        </div>
+      </div>
+
+      <!-- ══ SERVICE ══ -->
+      <div class="panel" id="panel-service">
+        <div class="page-header">
+          <div class="page-title">Service History</div>
+          <div class="page-sub">Full maintenance record for your bike</div>
+        </div>
+
+        <div class="form-card" style="margin-bottom:1.5rem">
+          <h3>🛠️ Add service record</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+            <div class="fg"><label>Date</label><input type="date" id="svc-date"></div>
+            <div class="fg"><label>Odometer (km)</label><input type="number" id="svc-odo" placeholder="e.g. 12540">
+            </div>
+            <div class="fg"><label>Cost (₹)</label><input type="number" id="svc-cost" placeholder="e.g. 850"></div>
+          </div>
+          <div class="fg"><label>Service type / title</label><input type="text" id="svc-title"
+              placeholder="e.g. Full service, chain lube, brake pad replace…"></div>
+          <div class="fg"><label>Details / notes</label><textarea id="svc-notes"
+              placeholder="What was done, parts replaced, mechanic name, etc."></textarea></div>
+          <div class="fg"><label>Workshop / garage</label><input type="text" id="svc-shop"
+              placeholder="e.g. Royal Service Center, Hyderabad"></div>
+          <button class="btn btn-accent" onclick="addService()">Save service record</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Service records</div>
+          <div id="service-list"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ═══════════════════════════════════
+    //  DATA MODEL
+    // ═══════════════════════════════════
+    let data = {
+      initialOdo: 0,
+      rides: [],       // { date, time, odo }
+      petrols: [],     // { date, amount, price, litres }
+      oilChanges: [],  // { date, odo, notes }
+      tyreChecks: [],  // { date, tyre, psi, notes }
+      services: []     // { date, odo, cost, title, notes, shop }
+    };
+
+    let chartKm = null, chartPetrol = null, chartSpend = null;
+
+    // ─── Persistence ───
+    function saveLocal() {
+      try { localStorage.setItem('biketracker_v2', JSON.stringify(data)); } catch (e) { }
+    }
+    function loadLocal() {
+      try {
+        const s = localStorage.getItem('biketracker_v2');
+        if (s) data = { ...data, ...JSON.parse(s) };
+      } catch (e) { }
+    }
+
+    // ─── Fetch from repo (GitHub Pages) ───
+    async function fetchRepoData() {
+      try {
+        const res = await fetch('./bike-data.json?t=' + Date.now());
+        if (!res.ok) return false;
+        const imported = await res.json();
+        if (imported && (imported.rides || imported.petrols || imported.initialOdo !== undefined)) {
+          data = { ...data, ...imported };
+          saveLocal();
+          return true;
+        }
+      } catch (e) { }
+      return false;
+    }
+
+    // ─── Toast ───
+    function toast(msg, dur = 2400) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), dur);
+    }
+
+    // ─── Navigation ───
+    function nav(id, el) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('panel-' + id).classList.add('active');
+      el.classList.add('active');
+      if (id === 'dashboard') renderDashboard();
+      if (id === 'overall') renderOverall();
+      if (id === 'rides') renderRides();
+      if (id === 'petrol') renderPetrolLog();
+      if (id === 'oil') renderOil();
+      if (id === 'tyre') renderTyre();
+      if (id === 'service') renderService();
+    }
+
+    // ═══════════════════════════════════
+    //  HELPERS
+    // ═══════════════════════════════════
+    function getTotalOdo() {
+      if (!data.rides.length) return data.initialOdo || 0;
+      return Math.max(...data.rides.map(r => r.odo));
+    }
+
+    function getAllMonths() {
+      const months = new Set();
+      const now = new Date();
+      months.add(now.toISOString().slice(0, 7));
+      data.rides.forEach(r => months.add(r.date.slice(0, 7)));
+      data.petrols.forEach(p => months.add(p.date.slice(0, 7)));
+      return [...months].sort().reverse();
+    }
+
+    function getMonthKm(month) {
+      const monthRides = data.rides
+        .filter(r => r.date.startsWith(month))
+        .sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time) || a.odo - b.odo);
+      if (!monthRides.length) return 0;
+      const allSorted = [...data.rides].sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time) || a.odo - b.odo);
+      let total = 0;
+      monthRides.forEach(ride => {
+        const idx = allSorted.indexOf(ride);
+        const prev = idx > 0 ? allSorted[idx - 1].odo : (data.initialOdo || 0);
+        total += Math.max(0, ride.odo - prev);
+      });
+      return Math.round(total);
+    }
+
+    function getMonthLitres(month) {
+      return data.petrols.filter(p => p.date.startsWith(month)).reduce((s, p) => s + p.litres, 0);
+    }
+
+    function getMonthSpend(month) {
+      return data.petrols.filter(p => p.date.startsWith(month)).reduce((s, p) => s + p.amount, 0);
+    }
+
+    function fmtDate(d) {
+      if (!d) return '—';
+      const [y, m, day] = d.split('-');
+      return `${day}/${m}/${y}`;
+    }
+
+    // ═══════════════════════════════════
+    //  OIL BANNER
+    // ═══════════════════════════════════
+    function renderOilBanner(containerId) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      const OIL_INTERVAL = 2000;
+      const currentOdo = getTotalOdo();
+
+      if (!data.oilChanges.length) {
+        el.innerHTML = `<div class="oil-banner warn">
       <div class="oil-icon">🔧</div>
       <div class="oil-text">
         <div class="oil-title">No oil change recorded yet</div>
         <div class="oil-sub">Add your first oil change record to start tracking</div>
       </div>
     </div>`;
-    return;
-  }
+        return;
+      }
 
-  const lastChange = [...data.oilChanges].sort((a,b) => b.odo - a.odo)[0];
-  const kmSince = currentOdo - lastChange.odo;
-  const kmLeft = OIL_INTERVAL - kmSince;
-  const pct = Math.min(100, (kmSince / OIL_INTERVAL) * 100);
+      const lastChange = [...data.oilChanges].sort((a, b) => b.odo - a.odo)[0];
+      const kmSince = currentOdo - lastChange.odo;
+      const kmLeft = OIL_INTERVAL - kmSince;
+      const pct = Math.min(100, (kmSince / OIL_INTERVAL) * 100);
 
-  let cls = 'ok', icon = '✅', title = '', sub = '';
-  if (kmLeft <= 0) {
-    cls = 'due'; icon = '🚨';
-    title = `Oil change overdue by ${Math.abs(kmLeft).toLocaleString()} km`;
-    sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)}`;
-  } else if (kmLeft <= 300) {
-    cls = 'warn'; icon = '⚠️';
-    title = `Oil change due in ${kmLeft.toLocaleString()} km`;
-    sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)}`;
-  } else {
-    title = `Engine oil OK — ${kmLeft.toLocaleString()} km remaining`;
-    sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)} · ${kmSince.toLocaleString()} km used`;
-  }
+      let cls = 'ok', icon = '✅', title = '', sub = '';
+      if (kmLeft <= 0) {
+        cls = 'due'; icon = '🚨';
+        title = `Oil change overdue by ${Math.abs(kmLeft).toLocaleString()} km`;
+        sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)}`;
+      } else if (kmLeft <= 300) {
+        cls = 'warn'; icon = '⚠️';
+        title = `Oil change due in ${kmLeft.toLocaleString()} km`;
+        sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)}`;
+      } else {
+        title = `Engine oil OK — ${kmLeft.toLocaleString()} km remaining`;
+        sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)} · ${kmSince.toLocaleString()} km used`;
+      }
 
-  const barColor = cls === 'ok' ? 'var(--green)' : cls === 'warn' ? 'var(--yellow)' : 'var(--red)';
+      const barColor = cls === 'ok' ? 'var(--green)' : cls === 'warn' ? 'var(--yellow)' : 'var(--red)';
 
-  el.innerHTML = `<div class="oil-banner ${cls}" style="margin-bottom:1.5rem">
+      el.innerHTML = `<div class="oil-banner ${cls}" style="margin-bottom:1.5rem">
     <div class="oil-icon">${icon}</div>
     <div class="oil-text" style="flex:1">
       <div class="oil-title">${title}</div>
@@ -783,316 +1265,316 @@ function renderOilBanner(containerId) {
       <div style="font-size:10px;color:var(--text3)">km since</div>
     </div>
   </div>`;
-}
+    }
 
-// ═══════════════════════════════════
-//  DASHBOARD
-// ═══════════════════════════════════
-function populateMonthSelector() {
-  const sel = document.getElementById('monthSelector');
-  const months = getAllMonths();
-  const current = sel.value;
-  sel.innerHTML = '';
-  months.forEach(m => {
-    const [y, mo] = m.split('-');
-    const opt = document.createElement('option');
-    opt.value = m;
-    opt.textContent = new Date(y, parseInt(mo)-1, 1).toLocaleString('default', {month:'long', year:'numeric'});
-    sel.appendChild(opt);
-  });
-  if (current && months.includes(current)) sel.value = current;
-}
+    // ═══════════════════════════════════
+    //  DASHBOARD
+    // ═══════════════════════════════════
+    function populateMonthSelector() {
+      const sel = document.getElementById('monthSelector');
+      const months = getAllMonths();
+      const current = sel.value;
+      sel.innerHTML = '';
+      months.forEach(m => {
+        const [y, mo] = m.split('-');
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = new Date(y, parseInt(mo) - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+        sel.appendChild(opt);
+      });
+      if (current && months.includes(current)) sel.value = current;
+    }
 
-function renderDashboard() {
-  populateMonthSelector();
-  const month = document.getElementById('monthSelector').value;
-  if (!month) return;
+    function renderDashboard() {
+      populateMonthSelector();
+      const month = document.getElementById('monthSelector').value;
+      if (!month) return;
 
-  const km = getMonthKm(month);
-  const litres = getMonthLitres(month);
-  const spend = getMonthSpend(month);
-  const avg = (litres > 0 && km > 0) ? (km / litres).toFixed(1) : '—';
-  const days = new Set(data.rides.filter(r => r.date.startsWith(month)).map(r => r.date)).size;
-  const rides = data.rides.filter(r => r.date.startsWith(month)).length;
-  const odo = getTotalOdo();
+      const km = getMonthKm(month);
+      const litres = getMonthLitres(month);
+      const spend = getMonthSpend(month);
+      const avg = (litres > 0 && km > 0) ? (km / litres).toFixed(1) : '—';
+      const days = new Set(data.rides.filter(r => r.date.startsWith(month)).map(r => r.date)).size;
+      const rides = data.rides.filter(r => r.date.startsWith(month)).length;
+      const odo = getTotalOdo();
 
-  document.getElementById('mon-km').textContent = km.toLocaleString();
-  document.getElementById('mon-litres').textContent = litres.toFixed(2);
-  document.getElementById('mon-avg').textContent = avg === '—' ? '—' : avg;
-  document.getElementById('mon-spend').textContent = '₹' + Math.round(spend).toLocaleString();
-  document.getElementById('mon-days').textContent = days;
-  document.getElementById('mon-rides').textContent = rides;
-  document.getElementById('total-odo').textContent = odo.toLocaleString();
+      document.getElementById('mon-km').textContent = km.toLocaleString();
+      document.getElementById('mon-litres').textContent = litres.toFixed(2);
+      document.getElementById('mon-avg').textContent = avg === '—' ? '—' : avg;
+      document.getElementById('mon-spend').textContent = '₹' + Math.round(spend).toLocaleString();
+      document.getElementById('mon-days').textContent = days;
+      document.getElementById('mon-rides').textContent = rides;
+      document.getElementById('total-odo').textContent = odo.toLocaleString();
 
-  document.getElementById('sidebar-odo').textContent = odo.toLocaleString() + ' km on clock';
+      document.getElementById('sidebar-odo').textContent = odo.toLocaleString() + ' km on clock';
 
-  // Animate rings
-  const circumference = 2 * Math.PI * 42;
-  const allKms = getAllMonths().map(m => getMonthKm(m));
-  const allLitres = getAllMonths().map(m => getMonthLitres(m));
-  const maxKm = Math.max(...allKms, 1);
-  const maxLitres = Math.max(...allLitres, 1);
-  const kmDash = (km / maxKm) * circumference;
-  const lDash = (litres / maxLitres) * circumference;
+      // Animate rings
+      const circumference = 2 * Math.PI * 42;
+      const allKms = getAllMonths().map(m => getMonthKm(m));
+      const allLitres = getAllMonths().map(m => getMonthLitres(m));
+      const maxKm = Math.max(...allKms, 1);
+      const maxLitres = Math.max(...allLitres, 1);
+      const kmDash = (km / maxKm) * circumference;
+      const lDash = (litres / maxLitres) * circumference;
 
-  const kArc = document.getElementById('ring-km-arc');
-  const pArc = document.getElementById('ring-petrol-arc');
-  if (kArc) kArc.style.strokeDasharray = `${kmDash.toFixed(1)} ${(circumference - kmDash).toFixed(1)}`;
-  if (pArc) pArc.style.strokeDasharray = `${lDash.toFixed(1)} ${(circumference - lDash).toFixed(1)}`;
+      const kArc = document.getElementById('ring-km-arc');
+      const pArc = document.getElementById('ring-petrol-arc');
+      if (kArc) kArc.style.strokeDasharray = `${kmDash.toFixed(1)} ${(circumference - kmDash).toFixed(1)}`;
+      if (pArc) pArc.style.strokeDasharray = `${lDash.toFixed(1)} ${(circumference - lDash).toFixed(1)}`;
 
-  renderOilBanner('oil-banner-dash');
-}
+      renderOilBanner('oil-banner-dash');
+    }
 
-// ─── Ride hint ───
-function updateRideHint() {
-  const odo = parseFloat(document.getElementById('ride-odo').value);
-  const hint = document.getElementById('ride-hint');
-  if (!odo) { hint.textContent = ''; return; }
-  const allSorted = [...data.rides].sort((a,b) => a.odo - b.odo);
-  const lastOdo = allSorted.length ? allSorted[allSorted.length-1].odo : (data.initialOdo || 0);
-  const diff = odo - lastOdo;
-  if (diff > 0) hint.textContent = `+${diff.toLocaleString()} km from last reading (${lastOdo.toLocaleString()} km)`;
-  else if (diff === 0) hint.textContent = 'Same as last reading';
-  else hint.textContent = `⚠ Less than last reading (${lastOdo.toLocaleString()} km)`;
-}
+    // ─── Ride hint ───
+    function updateRideHint() {
+      const odo = parseFloat(document.getElementById('ride-odo').value);
+      const hint = document.getElementById('ride-hint');
+      if (!odo) { hint.textContent = ''; return; }
+      const allSorted = [...data.rides].sort((a, b) => a.odo - b.odo);
+      const lastOdo = allSorted.length ? allSorted[allSorted.length - 1].odo : (data.initialOdo || 0);
+      const diff = odo - lastOdo;
+      if (diff > 0) hint.textContent = `+${diff.toLocaleString()} km from last reading (${lastOdo.toLocaleString()} km)`;
+      else if (diff === 0) hint.textContent = 'Same as last reading';
+      else hint.textContent = `⚠ Less than last reading (${lastOdo.toLocaleString()} km)`;
+    }
 
-function updatePetrolHint() {
-  const a = parseFloat(document.getElementById('petrol-amount').value);
-  const p = parseFloat(document.getElementById('petrol-price').value);
-  const h = document.getElementById('petrol-calc-hint');
-  if (a > 0 && p > 0) h.textContent = `= ${(a/p).toFixed(2)} litres`;
-  else h.textContent = '';
-}
+    function updatePetrolHint() {
+      const a = parseFloat(document.getElementById('petrol-amount').value);
+      const p = parseFloat(document.getElementById('petrol-price').value);
+      const h = document.getElementById('petrol-calc-hint');
+      if (a > 0 && p > 0) h.textContent = `= ${(a / p).toFixed(2)} litres`;
+      else h.textContent = '';
+    }
 
-// ═══════════════════════════════════
-//  ADD ENTRIES
-// ═══════════════════════════════════
-function addRide() {
-  const date = document.getElementById('ride-date').value;
-  const time = document.getElementById('ride-time').value;
-  const odo = parseFloat(document.getElementById('ride-odo').value);
-  if (!date) { toast('Select a date'); return; }
-  if (!time) { toast('Enter the time'); return; }
-  if (!odo || odo <= 0) { toast('Enter a valid odometer reading'); return; }
-  const allSorted = [...data.rides].sort((a,b) => a.odo - b.odo);
-  const lastOdo = allSorted.length ? allSorted[allSorted.length-1].odo : (data.initialOdo || 0);
-  if (odo < lastOdo) { toast(`Odometer must be ≥ ${lastOdo.toLocaleString()} km`); return; }
-  data.rides.push({ date, time, odo });
-  data.rides.sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time));
-  saveLocal();
-  document.getElementById('ride-odo').value = '';
-  document.getElementById('ride-hint').textContent = '';
-  populateMonthSelector();
-  renderDashboard();
-  toast('Ride logged ✓');
-}
+    // ═══════════════════════════════════
+    //  ADD ENTRIES
+    // ═══════════════════════════════════
+    function addRide() {
+      const date = document.getElementById('ride-date').value;
+      const time = document.getElementById('ride-time').value;
+      const odo = parseFloat(document.getElementById('ride-odo').value);
+      if (!date) { toast('Select a date'); return; }
+      if (!time) { toast('Enter the time'); return; }
+      if (!odo || odo <= 0) { toast('Enter a valid odometer reading'); return; }
+      const allSorted = [...data.rides].sort((a, b) => a.odo - b.odo);
+      const lastOdo = allSorted.length ? allSorted[allSorted.length - 1].odo : (data.initialOdo || 0);
+      if (odo < lastOdo) { toast(`Odometer must be ≥ ${lastOdo.toLocaleString()} km`); return; }
+      data.rides.push({ date, time, odo });
+      data.rides.sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
+      saveLocal();
+      document.getElementById('ride-odo').value = '';
+      document.getElementById('ride-hint').textContent = '';
+      populateMonthSelector();
+      renderDashboard();
+      toast('Ride logged ✓');
+    }
 
-function addPetrol() {
-  const date = document.getElementById('petrol-date').value;
-  const amount = parseFloat(document.getElementById('petrol-amount').value);
-  // const price = parseFloat(document.getElementById('petrol-price').value);
-  const price = 115.8;
-  if (!date) { toast('Select a date'); return; }
-  if (!amount || amount <= 0) { toast('Enter amount paid'); return; }
-  if (!price || price <= 0) { toast('Enter price per litre'); return; }
-  const litres = parseFloat((amount / price).toFixed(3));
-  data.petrols.push({ date, amount, price, litres });
-  data.petrols.sort((a,b) => new Date(a.date) - new Date(b.date));
-  saveLocal();
-  document.getElementById('petrol-amount').value = '';
-  document.getElementById('petrol-price').value = '';
-  document.getElementById('petrol-calc-hint').textContent = '';
-  populateMonthSelector();
-  renderDashboard();
-  toast(`Added ${litres.toFixed(2)}L petrol ✓`);
-}
+    function addPetrol() {
+      const date = document.getElementById('petrol-date').value;
+      const amount = parseFloat(document.getElementById('petrol-amount').value);
+      // const price = parseFloat(document.getElementById('petrol-price').value);
+      const price = 115.8;
+      if (!date) { toast('Select a date'); return; }
+      if (!amount || amount <= 0) { toast('Enter amount paid'); return; }
+      if (!price || price <= 0) { toast('Enter price per litre'); return; }
+      const litres = parseFloat((amount / price).toFixed(3));
+      data.petrols.push({ date, amount, price, litres });
+      data.petrols.sort((a, b) => new Date(a.date) - new Date(b.date));
+      saveLocal();
+      document.getElementById('petrol-amount').value = '';
+      document.getElementById('petrol-price').value = '';
+      document.getElementById('petrol-calc-hint').textContent = '';
+      populateMonthSelector();
+      renderDashboard();
+      toast(`Added ${litres.toFixed(2)}L petrol ✓`);
+    }
 
-function addOilChange() {
-  const date = document.getElementById('oil-date').value;
-  const odo = parseFloat(document.getElementById('oil-odo').value);
-  const notes = document.getElementById('oil-notes').value.trim();
-  if (!date || !odo) { toast('Enter date and odometer reading'); return; }
-  data.oilChanges.push({ date, odo, notes });
-  data.oilChanges.sort((a,b) => new Date(a.date) - new Date(b.date));
-  saveLocal();
-  document.getElementById('oil-date').value = '';
-  document.getElementById('oil-odo').value = '';
-  document.getElementById('oil-notes').value = '';
-  renderOil();
-  toast('Oil change recorded ✓');
-}
+    function addOilChange() {
+      const date = document.getElementById('oil-date').value;
+      const odo = parseFloat(document.getElementById('oil-odo').value);
+      const notes = document.getElementById('oil-notes').value.trim();
+      if (!date || !odo) { toast('Enter date and odometer reading'); return; }
+      data.oilChanges.push({ date, odo, notes });
+      data.oilChanges.sort((a, b) => new Date(a.date) - new Date(b.date));
+      saveLocal();
+      document.getElementById('oil-date').value = '';
+      document.getElementById('oil-odo').value = '';
+      document.getElementById('oil-notes').value = '';
+      renderOil();
+      toast('Oil change recorded ✓');
+    }
 
-function addTyreCheck() {
-  const date = document.getElementById('tyre-date').value;
-  const tyre = document.getElementById('tyre-which').value;
-  const psi = document.getElementById('tyre-psi').value;
-  const notes = document.getElementById('tyre-notes').value.trim();
-  if (!date) { toast('Select a date'); return; }
-  data.tyreChecks.push({ date, tyre, psi: psi ? parseFloat(psi) : null, notes });
-  data.tyreChecks.sort((a,b) => new Date(a.date) - new Date(b.date));
-  saveLocal();
-  document.getElementById('tyre-psi').value = '';
-  document.getElementById('tyre-notes').value = '';
-  renderTyre();
-  toast('Tyre check saved ✓');
-}
+    function addTyreCheck() {
+      const date = document.getElementById('tyre-date').value;
+      const tyre = document.getElementById('tyre-which').value;
+      const psi = document.getElementById('tyre-psi').value;
+      const notes = document.getElementById('tyre-notes').value.trim();
+      if (!date) { toast('Select a date'); return; }
+      data.tyreChecks.push({ date, tyre, psi: psi ? parseFloat(psi) : null, notes });
+      data.tyreChecks.sort((a, b) => new Date(a.date) - new Date(b.date));
+      saveLocal();
+      document.getElementById('tyre-psi').value = '';
+      document.getElementById('tyre-notes').value = '';
+      renderTyre();
+      toast('Tyre check saved ✓');
+    }
 
-function addService() {
-  const date = document.getElementById('svc-date').value;
-  const odo = parseFloat(document.getElementById('svc-odo').value) || null;
-  const cost = parseFloat(document.getElementById('svc-cost').value) || null;
-  const title = document.getElementById('svc-title').value.trim();
-  const notes = document.getElementById('svc-notes').value.trim();
-  const shop = document.getElementById('svc-shop').value.trim();
-  if (!date || !title) { toast('Date and service type are required'); return; }
-  data.services.push({ date, odo, cost, title, notes, shop });
-  data.services.sort((a,b) => new Date(b.date) - new Date(a.date));
-  saveLocal();
-  document.getElementById('svc-date').value = '';
-  document.getElementById('svc-odo').value = '';
-  document.getElementById('svc-cost').value = '';
-  document.getElementById('svc-title').value = '';
-  document.getElementById('svc-notes').value = '';
-  document.getElementById('svc-shop').value = '';
-  renderService();
-  toast('Service record saved ✓');
-}
+    function addService() {
+      const date = document.getElementById('svc-date').value;
+      const odo = parseFloat(document.getElementById('svc-odo').value) || null;
+      const cost = parseFloat(document.getElementById('svc-cost').value) || null;
+      const title = document.getElementById('svc-title').value.trim();
+      const notes = document.getElementById('svc-notes').value.trim();
+      const shop = document.getElementById('svc-shop').value.trim();
+      if (!date || !title) { toast('Date and service type are required'); return; }
+      data.services.push({ date, odo, cost, title, notes, shop });
+      data.services.sort((a, b) => new Date(b.date) - new Date(a.date));
+      saveLocal();
+      document.getElementById('svc-date').value = '';
+      document.getElementById('svc-odo').value = '';
+      document.getElementById('svc-cost').value = '';
+      document.getElementById('svc-title').value = '';
+      document.getElementById('svc-notes').value = '';
+      document.getElementById('svc-shop').value = '';
+      renderService();
+      toast('Service record saved ✓');
+    }
 
-// ═══════════════════════════════════
-//  RENDER PANELS
-// ═══════════════════════════════════
-function renderRides() {
-  const sorted = [...data.rides].sort((a,b) => new Date(b.date+'T'+b.time) - new Date(a.date+'T'+a.time));
-  const allSorted = [...data.rides].sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time));
+    // ═══════════════════════════════════
+    //  RENDER PANELS
+    // ═══════════════════════════════════
+    function renderRides() {
+      const sorted = [...data.rides].sort((a, b) => new Date(b.date + 'T' + b.time) - new Date(a.date + 'T' + a.time));
+      const allSorted = [...data.rides].sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
 
-  if (!sorted.length) {
-    document.getElementById('rides-table').innerHTML = '<div class="empty"><div class="e-icon">🛣️</div>No rides logged yet</div>';
-    return;
-  }
+      if (!sorted.length) {
+        document.getElementById('rides-table').innerHTML = '<div class="empty"><div class="e-icon">🛣️</div>No rides logged yet</div>';
+        return;
+      }
 
-  let html = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Odometer</th><th>Distance</th><th></th></tr></thead><tbody>';
-  sorted.forEach(ride => {
-    const idx = allSorted.indexOf(ride);
-    const prev = idx > 0 ? allSorted[idx-1].odo : (data.initialOdo || 0);
-    const dist = Math.max(0, ride.odo - prev);
-    html += `<tr>
+      let html = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Odometer</th><th>Distance</th><th></th></tr></thead><tbody>';
+      sorted.forEach(ride => {
+        const idx = allSorted.indexOf(ride);
+        const prev = idx > 0 ? allSorted[idx - 1].odo : (data.initialOdo || 0);
+        const dist = Math.max(0, ride.odo - prev);
+        html += `<tr>
       <td class="primary">${fmtDate(ride.date)}</td>
       <td>${ride.time || '—'}</td>
       <td>${ride.odo.toLocaleString()} km</td>
       <td><span class="badge badge-ride">+${dist.toLocaleString()} km</span></td>
       <td><button class="del-btn" onclick="delRide('${ride.date}','${ride.time}',${ride.odo})">✕</button></td>
     </tr>`;
-  });
-  html += '</tbody></table></div>';
-  document.getElementById('rides-table').innerHTML = html;
-}
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('rides-table').innerHTML = html;
+    }
 
-function renderPetrolLog() {
-  const sorted = [...data.petrols].sort((a,b) => new Date(b.date) - new Date(a.date));
-  const totalL = sorted.reduce((s,p) => s + p.litres, 0);
-  const totalSpend = sorted.reduce((s,p) => s + p.amount, 0);
+    function renderPetrolLog() {
+      const sorted = [...data.petrols].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const totalL = sorted.reduce((s, p) => s + p.litres, 0);
+      const totalSpend = sorted.reduce((s, p) => s + p.amount, 0);
 
-  if (!sorted.length) {
-    document.getElementById('petrol-table').innerHTML = '<div class="empty"><div class="e-icon">⛽</div>No petrol entries yet</div>';
-    return;
-  }
+      if (!sorted.length) {
+        document.getElementById('petrol-table').innerHTML = '<div class="empty"><div class="e-icon">⛽</div>No petrol entries yet</div>';
+        return;
+      }
 
-  let html = `<div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+      let html = `<div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
     <div class="stat-tile" style="flex:1;min-width:120px"><div class="num">${totalL.toFixed(1)} L</div><div class="desc">total litres</div></div>
     <div class="stat-tile" style="flex:1;min-width:120px"><div class="num">₹${Math.round(totalSpend).toLocaleString()}</div><div class="desc">total spent</div></div>
   </div>
   <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Amount paid</th><th>Price/L</th><th>Litres added</th><th>Total litres</th><th></th></tr></thead><tbody>`;
 
-  let cumulative = 0;
-  const byDate = [...sorted].reverse();
-  byDate.forEach(p => { p._cum = (cumulative += p.litres); });
+      let cumulative = 0;
+      const byDate = [...sorted].reverse();
+      byDate.forEach(p => { p._cum = (cumulative += p.litres); });
 
-  sorted.forEach(p => {
-    html += `<tr>
+      sorted.forEach(p => {
+        html += `<tr>
       <td class="primary">${fmtDate(p.date)}</td>
       <td>₹${p.amount.toLocaleString()}</td>
       <td>₹${p.price}/L</td>
       <td><span class="badge badge-petrol">${p.litres.toFixed(2)} L</span></td>
-      <td style="color:var(--text2)">${(p._cum||0).toFixed(2)} L</td>
+      <td style="color:var(--text2)">${(p._cum || 0).toFixed(2)} L</td>
       <td><button class="del-btn" onclick="delPetrol('${p.date}',${p.amount})">✕</button></td>
     </tr>`;
-  });
-  html += '</tbody></table></div>';
-  document.getElementById('petrol-table').innerHTML = html;
-}
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('petrol-table').innerHTML = html;
+    }
 
-function renderOil() {
-  renderOilBanner('oil-banner-main');
-  const sorted = [...data.oilChanges].sort((a,b) => new Date(b.date) - new Date(a.date));
-  if (!sorted.length) {
-    document.getElementById('oil-table').innerHTML = '<div class="empty"><div class="e-icon">🔧</div>No oil changes recorded yet</div>';
-    return;
-  }
-  let html = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Odometer</th><th>Notes</th><th></th></tr></thead><tbody>';
-  sorted.forEach((o, i) => {
-    html += `<tr>
+    function renderOil() {
+      renderOilBanner('oil-banner-main');
+      const sorted = [...data.oilChanges].sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (!sorted.length) {
+        document.getElementById('oil-table').innerHTML = '<div class="empty"><div class="e-icon">🔧</div>No oil changes recorded yet</div>';
+        return;
+      }
+      let html = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Odometer</th><th>Notes</th><th></th></tr></thead><tbody>';
+      sorted.forEach((o, i) => {
+        html += `<tr>
       <td class="primary">${fmtDate(o.date)}${i === 0 ? ' <span class="badge badge-oil">Latest</span>' : ''}</td>
       <td>${o.odo.toLocaleString()} km</td>
       <td style="color:var(--text2)">${o.notes || '—'}</td>
       <td><button class="del-btn" onclick="delOil('${o.date}',${o.odo})">✕</button></td>
     </tr>`;
-  });
-  html += '</tbody></table></div>';
-  document.getElementById('oil-table').innerHTML = html;
-}
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('oil-table').innerHTML = html;
+    }
 
-function renderTyre() {
-  // Summary cards
-  const frontChecks = [...data.tyreChecks].filter(t => t.tyre === 'front' || t.tyre === 'both').sort((a,b) => new Date(b.date) - new Date(a.date));
-  const rearChecks = [...data.tyreChecks].filter(t => t.tyre === 'rear' || t.tyre === 'both').sort((a,b) => new Date(b.date) - new Date(a.date));
+    function renderTyre() {
+      // Summary cards
+      const frontChecks = [...data.tyreChecks].filter(t => t.tyre === 'front' || t.tyre === 'both').sort((a, b) => new Date(b.date) - new Date(a.date));
+      const rearChecks = [...data.tyreChecks].filter(t => t.tyre === 'rear' || t.tyre === 'both').sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const fLast = frontChecks[0];
-  const rLast = rearChecks[0];
+      const fLast = frontChecks[0];
+      const rLast = rearChecks[0];
 
-  document.getElementById('tyre-front-date').textContent = fLast ? `Last checked: ${fmtDate(fLast.date)}` : 'Never recorded';
-  document.getElementById('tyre-front-note').textContent = fLast ? (fLast.psi ? `${fLast.psi} PSI` + (fLast.notes ? ' · ' + fLast.notes : '') : fLast.notes || '') : '';
-  document.getElementById('tyre-rear-date').textContent = rLast ? `Last checked: ${fmtDate(rLast.date)}` : 'Never recorded';
-  document.getElementById('tyre-rear-note').textContent = rLast ? (rLast.psi ? `${rLast.psi} PSI` + (rLast.notes ? ' · ' + rLast.notes : '') : rLast.notes || '') : '';
+      document.getElementById('tyre-front-date').textContent = fLast ? `Last checked: ${fmtDate(fLast.date)}` : 'Never recorded';
+      document.getElementById('tyre-front-note').textContent = fLast ? (fLast.psi ? `${fLast.psi} PSI` + (fLast.notes ? ' · ' + fLast.notes : '') : fLast.notes || '') : '';
+      document.getElementById('tyre-rear-date').textContent = rLast ? `Last checked: ${fmtDate(rLast.date)}` : 'Never recorded';
+      document.getElementById('tyre-rear-note').textContent = rLast ? (rLast.psi ? `${rLast.psi} PSI` + (rLast.notes ? ' · ' + rLast.notes : '') : rLast.notes || '') : '';
 
-  const sorted = [...data.tyreChecks].sort((a,b) => new Date(b.date) - new Date(a.date));
-  if (!sorted.length) {
-    document.getElementById('tyre-table').innerHTML = '<div class="empty"><div class="e-icon">🔵</div>No tyre checks recorded yet</div>';
-    return;
-  }
-  let html = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Tyre</th><th>Pressure</th><th>Notes</th><th></th></tr></thead><tbody>';
-  sorted.forEach(t => {
-    html += `<tr>
+      const sorted = [...data.tyreChecks].sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (!sorted.length) {
+        document.getElementById('tyre-table').innerHTML = '<div class="empty"><div class="e-icon">🔵</div>No tyre checks recorded yet</div>';
+        return;
+      }
+      let html = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Tyre</th><th>Pressure</th><th>Notes</th><th></th></tr></thead><tbody>';
+      sorted.forEach(t => {
+        html += `<tr>
       <td class="primary">${fmtDate(t.date)}</td>
       <td><span class="badge badge-tyre">${t.tyre.charAt(0).toUpperCase() + t.tyre.slice(1)}</span></td>
       <td>${t.psi ? t.psi + ' PSI' : '—'}</td>
       <td style="color:var(--text2)">${t.notes || '—'}</td>
       <td><button class="del-btn" onclick="delTyre('${t.date}','${t.tyre}')">✕</button></td>
     </tr>`;
-  });
-  html += '</tbody></table></div>';
-  document.getElementById('tyre-table').innerHTML = html;
-}
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('tyre-table').innerHTML = html;
+    }
 
-function renderService() {
-  const sorted = [...data.services].sort((a,b) => new Date(b.date) - new Date(a.date));
-  const totalCost = sorted.reduce((s,sv) => s + (sv.cost || 0), 0);
+    function renderService() {
+      const sorted = [...data.services].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const totalCost = sorted.reduce((s, sv) => s + (sv.cost || 0), 0);
 
-  if (!sorted.length) {
-    document.getElementById('service-list').innerHTML = '<div class="empty"><div class="e-icon">🛠️</div>No service records yet</div>';
-    return;
-  }
+      if (!sorted.length) {
+        document.getElementById('service-list').innerHTML = '<div class="empty"><div class="e-icon">🛠️</div>No service records yet</div>';
+        return;
+      }
 
-  let html = '';
-  if (totalCost > 0) {
-    html += `<div style="display:flex;gap:1rem;margin-bottom:1rem">
+      let html = '';
+      if (totalCost > 0) {
+        html += `<div style="display:flex;gap:1rem;margin-bottom:1rem">
       <div class="stat-tile" style="flex:1"><div class="num">₹${Math.round(totalCost).toLocaleString()}</div><div class="desc">total service cost</div></div>
       <div class="stat-tile" style="flex:1"><div class="num">${sorted.length}</div><div class="desc">service records</div></div>
     </div>`;
-  }
+      }
 
-  sorted.forEach((sv, i) => {
-    const isRecent = i === 0;
-    html += `<div class="service-item">
+      sorted.forEach((sv, i) => {
+        const isRecent = i === 0;
+        html += `<div class="service-item">
       <div class="service-dot${isRecent ? '' : ' old'}"></div>
       <div class="service-info">
         <div class="service-title">${sv.title} ${isRecent ? '<span class="badge badge-service">Latest</span>' : ''}</div>
@@ -1104,138 +1586,139 @@ function renderService() {
         </div>
         ${sv.notes ? `<div class="service-desc">${sv.notes}</div>` : ''}
       </div>
-      <button class="del-btn" onclick="delService('${sv.date}','${sv.title.replace(/'/g,"\\'")}')">✕</button>
+      <button class="del-btn" onclick="delService('${sv.date}','${sv.title.replace(/'/g, "\\'")}')">✕</button>
     </div>`;
-  });
-  document.getElementById('service-list').innerHTML = html;
-}
-
-// ═══════════════════════════════════
-//  OVERALL CHARTS
-// ═══════════════════════════════════
-function renderOverall() {
-  const totalKm = getTotalOdo() - (data.initialOdo || 0);
-  const totalL = data.petrols.reduce((s,p) => s + p.litres, 0);
-  const totalSpend = data.petrols.reduce((s,p) => s + p.amount, 0);
-  const avg = totalL > 0 && totalKm > 0 ? (totalKm / totalL).toFixed(1) : '—';
-
-  document.getElementById('ov-km').textContent = Math.round(totalKm).toLocaleString() + ' km';
-  document.getElementById('ov-litres').textContent = totalL.toFixed(1) + ' L';
-  document.getElementById('ov-spend').textContent = '₹' + Math.round(totalSpend).toLocaleString();
-  document.getElementById('ov-avg').textContent = avg === '—' ? '—' : avg + ' km/L';
-
-  const months = getAllMonths().reverse();
-  const labels = months.map(m => {
-    const [y, mo] = m.split('-');
-    return new Date(y, parseInt(mo)-1, 1).toLocaleString('default', {month:'short', year:'2-digit'});
-  });
-  const kmData = months.map(m => getMonthKm(m));
-  const petrolData = months.map(m => parseFloat(getMonthLitres(m).toFixed(2)));
-  const spendData = months.map(m => Math.round(getMonthSpend(m)));
-
-  const baseOpts = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: '#5e5c58', font: { size: 11 }, autoSkip: false, maxRotation: 45 }, grid: { display: false }, border: { color: '#2a2a2a' } },
-      y: { ticks: { color: '#5e5c58', font: { size: 11 } }, grid: { color: '#1e1e1e' }, border: { display: false } }
+      });
+      document.getElementById('service-list').innerHTML = html;
     }
-  };
 
-  if (chartKm) chartKm.destroy();
-  chartKm = new Chart(document.getElementById('chart-km'), {
-    type: 'bar',
-    data: { labels, datasets: [{ data: kmData, backgroundColor: '#4a9eff', borderRadius: 4, borderSkipped: 'bottom' }] },
-    options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => v + ' km' } } } }
-  });
+    // ═══════════════════════════════════
+    //  OVERALL CHARTS
+    // ═══════════════════════════════════
+    function renderOverall() {
+      const totalKm = getTotalOdo() - (data.initialOdo || 0);
+      const totalL = data.petrols.reduce((s, p) => s + p.litres, 0);
+      const totalSpend = data.petrols.reduce((s, p) => s + p.amount, 0);
+      const avg = totalL > 0 && totalKm > 0 ? (totalKm / totalL).toFixed(1) : '—';
 
-  if (chartPetrol) chartPetrol.destroy();
-  chartPetrol = new Chart(document.getElementById('chart-petrol'), {
-    type: 'bar',
-    data: { labels, datasets: [{ data: petrolData, backgroundColor: '#f0b429', borderRadius: 4, borderSkipped: 'bottom' }] },
-    options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => v + ' L' } } } }
-  });
+      document.getElementById('ov-km').textContent = Math.round(totalKm).toLocaleString() + ' km';
+      document.getElementById('ov-litres').textContent = totalL.toFixed(1) + ' L';
+      document.getElementById('ov-spend').textContent = '₹' + Math.round(totalSpend).toLocaleString();
+      document.getElementById('ov-avg').textContent = avg === '—' ? '—' : avg + ' km/L';
 
-  if (chartSpend) chartSpend.destroy();
-  chartSpend = new Chart(document.getElementById('chart-spend'), {
-    type: 'bar',
-    data: { labels, datasets: [{ data: spendData, backgroundColor: '#e86c2f', borderRadius: 4, borderSkipped: 'bottom' }] },
-    options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => '₹' + v } } } }
-  });
-}
+      const months = getAllMonths().reverse();
+      const labels = months.map(m => {
+        const [y, mo] = m.split('-');
+        return new Date(y, parseInt(mo) - 1, 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+      });
+      const kmData = months.map(m => getMonthKm(m));
+      const petrolData = months.map(m => parseFloat(getMonthLitres(m).toFixed(2)));
+      const spendData = months.map(m => Math.round(getMonthSpend(m)));
 
-// ═══════════════════════════════════
-//  DELETE HELPERS
-// ═══════════════════════════════════
-function delRide(date, time, odo) {
-  if (!confirm(`Delete ride on ${fmtDate(date)} at ${time}?`)) return;
-  data.rides = data.rides.filter(r => !(r.date === date && r.time === time && r.odo === odo));
-  saveLocal(); renderRides(); renderDashboard();
-  toast('Ride deleted');
-}
-function delPetrol(date, amount) {
-  if (!confirm(`Delete petrol entry on ${fmtDate(date)}?`)) return;
-  data.petrols = data.petrols.filter(p => !(p.date === date && p.amount === amount));
-  saveLocal(); renderPetrolLog(); renderDashboard();
-  toast('Entry deleted');
-}
-function delOil(date, odo) {
-  if (!confirm(`Delete oil change on ${fmtDate(date)}?`)) return;
-  data.oilChanges = data.oilChanges.filter(o => !(o.date === date && o.odo === odo));
-  saveLocal(); renderOil(); renderOilBanner('oil-banner-dash');
-  toast('Oil record deleted');
-}
-function delTyre(date, tyre) {
-  if (!confirm(`Delete tyre check on ${fmtDate(date)}?`)) return;
-  data.tyreChecks = data.tyreChecks.filter(t => !(t.date === date && t.tyre === tyre));
-  saveLocal(); renderTyre();
-  toast('Tyre record deleted');
-}
-function delService(date, title) {
-  if (!confirm(`Delete service record "${title}"?`)) return;
-  data.services = data.services.filter(s => !(s.date === date && s.title === title));
-  saveLocal(); renderService();
-  toast('Service record deleted');
-}
+      const baseOpts = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#5e5c58', font: { size: 11 }, autoSkip: false, maxRotation: 45 }, grid: { display: false }, border: { color: '#2a2a2a' } },
+          y: { ticks: { color: '#5e5c58', font: { size: 11 } }, grid: { color: '#1e1e1e' }, border: { display: false } }
+        }
+      };
 
-// ═══════════════════════════════════
-//  EXPORT
-// ═══════════════════════════════════
-function exportData() {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'bike-data.json';
-  a.click();
-  toast('Exported bike-data.json — commit this to your GitHub repo!', 4000);
-}
+      if (chartKm) chartKm.destroy();
+      chartKm = new Chart(document.getElementById('chart-km'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data: kmData, backgroundColor: '#4a9eff', borderRadius: 4, borderSkipped: 'bottom' }] },
+        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => v + ' km' } } } }
+      });
 
-// ═══════════════════════════════════
-//  INIT
-// ═══════════════════════════════════
-function setTodayDefaults() {
-  const today = new Date().toISOString().slice(0,10);
-  const now = new Date().toTimeString().slice(0,5);
-  ['ride-date','petrol-date','oil-date','tyre-date','svc-date'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = today;
-  });
-  const rt = document.getElementById('ride-time');
-  if (rt) rt.value = now;
-}
+      if (chartPetrol) chartPetrol.destroy();
+      chartPetrol = new Chart(document.getElementById('chart-petrol'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data: petrolData, backgroundColor: '#f0b429', borderRadius: 4, borderSkipped: 'bottom' }] },
+        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => v + ' L' } } } }
+      });
 
-async function init() {
-  loadLocal();
-  const fetched = await fetchRepoData();
-  if (fetched) toast('Data loaded from repo', 1800);
-  setTodayDefaults();
-  populateMonthSelector();
-  renderDashboard();
-  document.getElementById('sidebar-odo').textContent = getTotalOdo().toLocaleString() + ' km on clock';
-}
+      if (chartSpend) chartSpend.destroy();
+      chartSpend = new Chart(document.getElementById('chart-spend'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data: spendData, backgroundColor: '#e86c2f', borderRadius: 4, borderSkipped: 'bottom' }] },
+        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => '₹' + v } } } }
+      });
+    }
 
-init();
-</script>
+    // ═══════════════════════════════════
+    //  DELETE HELPERS
+    // ═══════════════════════════════════
+    function delRide(date, time, odo) {
+      if (!confirm(`Delete ride on ${fmtDate(date)} at ${time}?`)) return;
+      data.rides = data.rides.filter(r => !(r.date === date && r.time === time && r.odo === odo));
+      saveLocal(); renderRides(); renderDashboard();
+      toast('Ride deleted');
+    }
+    function delPetrol(date, amount) {
+      if (!confirm(`Delete petrol entry on ${fmtDate(date)}?`)) return;
+      data.petrols = data.petrols.filter(p => !(p.date === date && p.amount === amount));
+      saveLocal(); renderPetrolLog(); renderDashboard();
+      toast('Entry deleted');
+    }
+    function delOil(date, odo) {
+      if (!confirm(`Delete oil change on ${fmtDate(date)}?`)) return;
+      data.oilChanges = data.oilChanges.filter(o => !(o.date === date && o.odo === odo));
+      saveLocal(); renderOil(); renderOilBanner('oil-banner-dash');
+      toast('Oil record deleted');
+    }
+    function delTyre(date, tyre) {
+      if (!confirm(`Delete tyre check on ${fmtDate(date)}?`)) return;
+      data.tyreChecks = data.tyreChecks.filter(t => !(t.date === date && t.tyre === tyre));
+      saveLocal(); renderTyre();
+      toast('Tyre record deleted');
+    }
+    function delService(date, title) {
+      if (!confirm(`Delete service record "${title}"?`)) return;
+      data.services = data.services.filter(s => !(s.date === date && s.title === title));
+      saveLocal(); renderService();
+      toast('Service record deleted');
+    }
+
+    // ═══════════════════════════════════
+    //  EXPORT
+    // ═══════════════════════════════════
+    function exportData() {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'bike-data.json';
+      a.click();
+      toast('Exported bike-data.json — commit this to your GitHub repo!', 4000);
+    }
+
+    // ═══════════════════════════════════
+    //  INIT
+    // ═══════════════════════════════════
+    function setTodayDefaults() {
+      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date().toTimeString().slice(0, 5);
+      ['ride-date', 'petrol-date', 'oil-date', 'tyre-date', 'svc-date'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = today;
+      });
+      const rt = document.getElementById('ride-time');
+      if (rt) rt.value = now;
+    }
+
+    async function init() {
+      loadLocal();
+      const fetched = await fetchRepoData();
+      if (fetched) toast('Data loaded from repo', 1800);
+      setTodayDefaults();
+      populateMonthSelector();
+      renderDashboard();
+      document.getElementById('sidebar-odo').textContent = getTotalOdo().toLocaleString() + ' km on clock';
+    }
+
+    init();
+  </script>
 </body>
+
 </html>
