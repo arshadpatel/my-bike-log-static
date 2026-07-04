@@ -875,8 +875,12 @@
 
         <div class="small-rings">
           <div class="small-card">
-            <div class="sc-val" id="mon-avg" style="color:var(--green)">—</div>
-            <div class="sc-lbl">km / litre avg</div>
+            <div class="sc-val" id="mon-current-mileage" style="color:var(--green)">—</div>
+            <div class="sc-lbl">current mileage (km/L)</div>
+          </div>
+          <div class="small-card">
+            <div class="sc-val" id="mon-max-mileage" style="color:var(--green)">—</div>
+            <div class="sc-lbl">best mileage (km/L)</div>
           </div>
           <div class="small-card">
             <div class="sc-val" id="mon-spend">₹0</div>
@@ -913,12 +917,16 @@
           <div class="form-card">
             <h3>⛽ Log petrol</h3>
             <div class="fg"><label>Date</label><input type="date" id="petrol-date"></div>
-            <div class="fg"><label>Amount paid (₹)</label><input type="number" id="petrol-amount" placeholder="e.g. 330"
-                oninput="updatePetrolHint()"></div>
+            <div class="fg"><label>Current odometer (km)</label><input type="number" id="petrol-odo"
+                placeholder="e.g. 12540"></div>
+            <div class="fg">
+              <label>Amount paid (₹)</label>
+              <input type="number" id="petrol-amount" placeholder="e.g. 330" oninput="updatePetrolHint()">
+              <div class="hint" id="petrol-calc-hint"></div>
+            </div>
             <div class="fg">
               <label>Price per litre (₹/L)</label>
-              <input type="number" id="petrol-price" placeholder="e.g. 115.8" step="0.1" oninput="updatePetrolHint()">
-              <div class="hint" id="petrol-calc-hint"></div>
+              <input type="number" id="petrol-price" value="115.81" disabled style="opacity:0.65;cursor:not-allowed">
             </div>
             <button class="btn btn-accent btn-full" onclick="addPetrol()">Add petrol</button>
           </div>
@@ -947,6 +955,10 @@
           <div class="stat-tile">
             <div class="num" id="ov-avg">—</div>
             <div class="desc">overall km/litre</div>
+          </div>
+          <div class="stat-tile">
+            <div class="num" id="ov-max-mileage">—</div>
+            <div class="desc">best mileage of all time</div>
           </div>
         </div>
         <div class="charts-grid">
@@ -983,7 +995,7 @@
       <div class="panel" id="panel-petrol">
         <div class="page-header">
           <div class="page-title">Petrol Log</div>
-          <div class="page-sub">All fill-ups with litres, cost, and price per litre</div>
+          <div class="page-sub">All fill-ups with odometer, litres, cost, and mileage since last fill</div>
         </div>
         <div class="card">
           <div id="petrol-table"></div>
@@ -1109,13 +1121,27 @@
     let data = {
       initialOdo: 0,
       rides: [],       // { date, time, odo }
-      petrols: [],     // { date, amount, price, litres }
+      petrols: [],     // { date, amount, price, litres, odo }
       oilChanges: [],  // { date, odo, notes }
       tyreChecks: [],  // { date, tyre, psi, notes }
       services: []     // { date, odo, cost, title, notes, shop }
     };
 
+    const PETROL_PRICE = 115.81; // ₹/L, auto-applied to every petrol log entry
+
     let chartKm = null, chartPetrol = null, chartSpend = null;
+
+    // ─── 2-decimal precision helpers (used for both background calculation and UI display) ───
+    function round2(n) {
+      const num = Number(n);
+      if (isNaN(num)) return 0;
+      return Math.round((num + Number.EPSILON) * 100) / 100;
+    }
+    function fmt2(n) {
+      const num = Number(n);
+      if (isNaN(num)) return '0.00';
+      return round2(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     // ─── Persistence ───
     function saveLocal() {
@@ -1170,8 +1196,12 @@
     //  HELPERS
     // ═══════════════════════════════════
     function getTotalOdo() {
-      if (!data.rides.length) return data.initialOdo || 0;
-      return Math.max(...data.rides.map(r => r.odo));
+      const odos = [
+        data.initialOdo || 0,
+        ...data.rides.map(r => r.odo),
+        ...data.petrols.filter(p => typeof p.odo === 'number' && !isNaN(p.odo)).map(p => p.odo)
+      ];
+      return round2(Math.max(...odos));
     }
 
     function getAllMonths() {
@@ -1195,15 +1225,67 @@
         const prev = idx > 0 ? allSorted[idx - 1].odo : (data.initialOdo || 0);
         total += Math.max(0, ride.odo - prev);
       });
-      return Math.round(total);
+      return round2(total);
     }
 
     function getMonthLitres(month) {
-      return data.petrols.filter(p => p.date.startsWith(month)).reduce((s, p) => s + p.litres, 0);
+      return round2(data.petrols.filter(p => p.date.startsWith(month)).reduce((s, p) => s + p.litres, 0));
     }
 
     function getMonthSpend(month) {
-      return data.petrols.filter(p => p.date.startsWith(month)).reduce((s, p) => s + p.amount, 0);
+      return round2(data.petrols.filter(p => p.date.startsWith(month)).reduce((s, p) => s + p.amount, 0));
+    }
+
+    // ─── Mileage (km/L) ───
+    // Mileage for a fill = (odometer at this fill − odometer at the previous fill) ÷ litres added at the PREVIOUS fill.
+    // i.e. the distance actually covered on that previous tank of fuel.
+    function getPetrolChain() {
+      const withOdo = data.petrols.filter(p => typeof p.odo === 'number' && !isNaN(p.odo));
+      const sorted = [...withOdo].sort((a, b) => a.odo - b.odo);
+      return sorted.map((p, idx) => {
+        let mileage = null;
+        if (idx > 0) {
+          const prev = sorted[idx - 1];
+          const dist = p.odo - prev.odo;
+          if (dist > 0 && prev.litres > 0) mileage = round2(dist / prev.litres);
+        }
+        return { ...p, mileage };
+      });
+    }
+
+    function mileageKey(p) {
+      return `${p.date}|${p.odo}|${p.amount}`;
+    }
+
+    function getMileageMap() {
+      const map = new Map();
+      getPetrolChain().forEach(p => map.set(mileageKey(p), p.mileage));
+      return map;
+    }
+
+    // "Current mileage" = mileage achieved on the most recently completed fuel cycle (not an average).
+    function getLatestMileage() {
+      const entries = getPetrolChain().filter(p => p.mileage !== null);
+      if (!entries.length) return null;
+      return entries[entries.length - 1].mileage;
+    }
+
+    function getMonthMaxMileage(month) {
+      const entries = getPetrolChain().filter(p => p.mileage !== null && p.date.startsWith(month));
+      if (!entries.length) return null;
+      return round2(Math.max(...entries.map(p => p.mileage)));
+    }
+
+    function getOverallAvgMileage() {
+      const entries = getPetrolChain().filter(p => p.mileage !== null);
+      if (!entries.length) return null;
+      return round2(entries.reduce((s, p) => s + p.mileage, 0) / entries.length);
+    }
+
+    function getOverallMaxMileage() {
+      const entries = getPetrolChain().filter(p => p.mileage !== null);
+      if (!entries.length) return null;
+      return round2(Math.max(...entries.map(p => p.mileage)));
     }
 
     function fmtDate(d) {
@@ -1233,22 +1315,22 @@
       }
 
       const lastChange = [...data.oilChanges].sort((a, b) => b.odo - a.odo)[0];
-      const kmSince = currentOdo - lastChange.odo;
-      const kmLeft = OIL_INTERVAL - kmSince;
-      const pct = Math.min(100, (kmSince / OIL_INTERVAL) * 100);
+      const kmSince = round2(currentOdo - lastChange.odo);
+      const kmLeft = round2(OIL_INTERVAL - kmSince);
+      const pct = Math.min(100, round2((kmSince / OIL_INTERVAL) * 100));
 
       let cls = 'ok', icon = '✅', title = '', sub = '';
       if (kmLeft <= 0) {
         cls = 'due'; icon = '🚨';
-        title = `Oil change overdue by ${Math.abs(kmLeft).toLocaleString()} km`;
-        sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)}`;
+        title = `Oil change overdue by ${fmt2(Math.abs(kmLeft))} km`;
+        sub = `Last changed at ${fmt2(lastChange.odo)} km on ${fmtDate(lastChange.date)}`;
       } else if (kmLeft <= 300) {
         cls = 'warn'; icon = '⚠️';
-        title = `Oil change due in ${kmLeft.toLocaleString()} km`;
-        sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)}`;
+        title = `Oil change due in ${fmt2(kmLeft)} km`;
+        sub = `Last changed at ${fmt2(lastChange.odo)} km on ${fmtDate(lastChange.date)}`;
       } else {
-        title = `Engine oil OK — ${kmLeft.toLocaleString()} km remaining`;
-        sub = `Last changed at ${lastChange.odo.toLocaleString()} km on ${fmtDate(lastChange.date)} · ${kmSince.toLocaleString()} km used`;
+        title = `Engine oil OK — ${fmt2(kmLeft)} km remaining`;
+        sub = `Last changed at ${fmt2(lastChange.odo)} km on ${fmtDate(lastChange.date)} · ${fmt2(kmSince)} km used`;
       }
 
       const barColor = cls === 'ok' ? 'var(--green)' : cls === 'warn' ? 'var(--yellow)' : 'var(--red)';
@@ -1258,10 +1340,10 @@
     <div class="oil-text" style="flex:1">
       <div class="oil-title">${title}</div>
       <div class="oil-sub">${sub}</div>
-      <div class="oil-progress"><div class="oil-bar" style="width:${pct.toFixed(1)}%;background:${barColor}"></div></div>
+      <div class="oil-progress"><div class="oil-bar" style="width:${pct.toFixed(2)}%;background:${barColor}"></div></div>
     </div>
     <div style="text-align:right;min-width:60px">
-      <div style="font-size:18px;font-weight:600">${kmSince.toLocaleString()}</div>
+      <div style="font-size:18px;font-weight:600">${fmt2(kmSince)}</div>
       <div style="font-size:10px;color:var(--text3)">km since</div>
     </div>
   </div>`;
@@ -1293,20 +1375,22 @@
       const km = getMonthKm(month);
       const litres = getMonthLitres(month);
       const spend = getMonthSpend(month);
-      const avg = (litres > 0 && km > 0) ? (km / litres).toFixed(1) : '—';
+      const currentMileage = getLatestMileage();
+      const maxMileage = getMonthMaxMileage(month);
       const days = new Set(data.rides.filter(r => r.date.startsWith(month)).map(r => r.date)).size;
       const rides = data.rides.filter(r => r.date.startsWith(month)).length;
       const odo = getTotalOdo();
 
-      document.getElementById('mon-km').textContent = km.toLocaleString();
-      document.getElementById('mon-litres').textContent = litres.toFixed(2);
-      document.getElementById('mon-avg').textContent = avg === '—' ? '—' : avg;
-      document.getElementById('mon-spend').textContent = '₹' + Math.round(spend).toLocaleString();
+      document.getElementById('mon-km').textContent = fmt2(km);
+      document.getElementById('mon-litres').textContent = fmt2(litres);
+      document.getElementById('mon-current-mileage').textContent = currentMileage === null ? '—' : fmt2(currentMileage);
+      document.getElementById('mon-max-mileage').textContent = maxMileage === null ? '—' : fmt2(maxMileage);
+      document.getElementById('mon-spend').textContent = '₹' + fmt2(spend);
       document.getElementById('mon-days').textContent = days;
       document.getElementById('mon-rides').textContent = rides;
-      document.getElementById('total-odo').textContent = odo.toLocaleString();
+      document.getElementById('total-odo').textContent = fmt2(odo);
 
-      document.getElementById('sidebar-odo').textContent = odo.toLocaleString() + ' km on clock';
+      document.getElementById('sidebar-odo').textContent = fmt2(odo) + ' km on clock';
 
       // Animate rings
       const circumference = 2 * Math.PI * 42;
@@ -1319,8 +1403,8 @@
 
       const kArc = document.getElementById('ring-km-arc');
       const pArc = document.getElementById('ring-petrol-arc');
-      if (kArc) kArc.style.strokeDasharray = `${kmDash.toFixed(1)} ${(circumference - kmDash).toFixed(1)}`;
-      if (pArc) pArc.style.strokeDasharray = `${lDash.toFixed(1)} ${(circumference - lDash).toFixed(1)}`;
+      if (kArc) kArc.style.strokeDasharray = `${kmDash.toFixed(2)} ${(circumference - kmDash).toFixed(2)}`;
+      if (pArc) pArc.style.strokeDasharray = `${lDash.toFixed(2)} ${(circumference - lDash).toFixed(2)}`;
 
       renderOilBanner('oil-banner-dash');
     }
@@ -1332,17 +1416,16 @@
       if (!odo) { hint.textContent = ''; return; }
       const allSorted = [...data.rides].sort((a, b) => a.odo - b.odo);
       const lastOdo = allSorted.length ? allSorted[allSorted.length - 1].odo : (data.initialOdo || 0);
-      const diff = odo - lastOdo;
-      if (diff > 0) hint.textContent = `+${diff.toLocaleString()} km from last reading (${lastOdo.toLocaleString()} km)`;
+      const diff = round2(odo - lastOdo);
+      if (diff > 0) hint.textContent = `+${fmt2(diff)} km from last reading (${fmt2(lastOdo)} km)`;
       else if (diff === 0) hint.textContent = 'Same as last reading';
-      else hint.textContent = `⚠ Less than last reading (${lastOdo.toLocaleString()} km)`;
+      else hint.textContent = `⚠ Less than last reading (${fmt2(lastOdo)} km)`;
     }
 
     function updatePetrolHint() {
       const a = parseFloat(document.getElementById('petrol-amount').value);
-      const p = parseFloat(document.getElementById('petrol-price').value);
       const h = document.getElementById('petrol-calc-hint');
-      if (a > 0 && p > 0) h.textContent = `= ${(a / p).toFixed(2)} litres`;
+      if (a > 0) h.textContent = `= ${fmt2(a / PETROL_PRICE)} litres @ ₹${fmt2(PETROL_PRICE)}/L`;
       else h.textContent = '';
     }
 
@@ -1358,8 +1441,8 @@
       if (!odo || odo <= 0) { toast('Enter a valid odometer reading'); return; }
       const allSorted = [...data.rides].sort((a, b) => a.odo - b.odo);
       const lastOdo = allSorted.length ? allSorted[allSorted.length - 1].odo : (data.initialOdo || 0);
-      if (odo < lastOdo) { toast(`Odometer must be ≥ ${lastOdo.toLocaleString()} km`); return; }
-      data.rides.push({ date, time, odo });
+      if (odo < lastOdo) { toast(`Odometer must be ≥ ${fmt2(lastOdo)} km`); return; }
+      data.rides.push({ date, time, odo: round2(odo) });
       data.rides.sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
       saveLocal();
       document.getElementById('ride-odo').value = '';
@@ -1371,22 +1454,24 @@
 
     function addPetrol() {
       const date = document.getElementById('petrol-date').value;
+      const odo = parseFloat(document.getElementById('petrol-odo').value);
       const amount = parseFloat(document.getElementById('petrol-amount').value);
-      // const price = parseFloat(document.getElementById('petrol-price').value);
-      const price = 115.8;
+      const price = PETROL_PRICE;
       if (!date) { toast('Select a date'); return; }
+      if (!odo || odo <= 0) { toast('Enter a valid odometer reading'); return; }
       if (!amount || amount <= 0) { toast('Enter amount paid'); return; }
-      if (!price || price <= 0) { toast('Enter price per litre'); return; }
-      const litres = parseFloat((amount / price).toFixed(3));
-      data.petrols.push({ date, amount, price, litres });
-      data.petrols.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const lastOdo = getTotalOdo();
+      if (odo < lastOdo) { toast(`Odometer must be ≥ ${fmt2(lastOdo)} km`); return; }
+      const litres = round2(amount / price);
+      data.petrols.push({ date, amount: round2(amount), price: round2(price), litres, odo: round2(odo) });
+      data.petrols.sort((a, b) => a.odo - b.odo);
       saveLocal();
+      document.getElementById('petrol-odo').value = '';
       document.getElementById('petrol-amount').value = '';
-      document.getElementById('petrol-price').value = '';
       document.getElementById('petrol-calc-hint').textContent = '';
       populateMonthSelector();
       renderDashboard();
-      toast(`Added ${litres.toFixed(2)}L petrol ✓`);
+      toast(`Added ${fmt2(litres)}L petrol ✓`);
     }
 
     function addOilChange() {
@@ -1394,7 +1479,7 @@
       const odo = parseFloat(document.getElementById('oil-odo').value);
       const notes = document.getElementById('oil-notes').value.trim();
       if (!date || !odo) { toast('Enter date and odometer reading'); return; }
-      data.oilChanges.push({ date, odo, notes });
+      data.oilChanges.push({ date, odo: round2(odo), notes });
       data.oilChanges.sort((a, b) => new Date(a.date) - new Date(b.date));
       saveLocal();
       document.getElementById('oil-date').value = '';
@@ -1410,7 +1495,7 @@
       const psi = document.getElementById('tyre-psi').value;
       const notes = document.getElementById('tyre-notes').value.trim();
       if (!date) { toast('Select a date'); return; }
-      data.tyreChecks.push({ date, tyre, psi: psi ? parseFloat(psi) : null, notes });
+      data.tyreChecks.push({ date, tyre, psi: psi ? round2(parseFloat(psi)) : null, notes });
       data.tyreChecks.sort((a, b) => new Date(a.date) - new Date(b.date));
       saveLocal();
       document.getElementById('tyre-psi').value = '';
@@ -1427,7 +1512,7 @@
       const notes = document.getElementById('svc-notes').value.trim();
       const shop = document.getElementById('svc-shop').value.trim();
       if (!date || !title) { toast('Date and service type are required'); return; }
-      data.services.push({ date, odo, cost, title, notes, shop });
+      data.services.push({ date, odo: odo === null ? null : round2(odo), cost: cost === null ? null : round2(cost), title, notes, shop });
       data.services.sort((a, b) => new Date(b.date) - new Date(a.date));
       saveLocal();
       document.getElementById('svc-date').value = '';
@@ -1456,12 +1541,12 @@
       sorted.forEach(ride => {
         const idx = allSorted.indexOf(ride);
         const prev = idx > 0 ? allSorted[idx - 1].odo : (data.initialOdo || 0);
-        const dist = Math.max(0, ride.odo - prev);
+        const dist = round2(Math.max(0, ride.odo - prev));
         html += `<tr>
       <td class="primary">${fmtDate(ride.date)}</td>
       <td>${ride.time || '—'}</td>
-      <td>${ride.odo.toLocaleString()} km</td>
-      <td><span class="badge badge-ride">+${dist.toLocaleString()} km</span></td>
+      <td>${fmt2(ride.odo)} km</td>
+      <td><span class="badge badge-ride">+${fmt2(dist)} km</span></td>
       <td><button class="del-btn" onclick="delRide('${ride.date}','${ride.time}',${ride.odo})">✕</button></td>
     </tr>`;
       });
@@ -1471,8 +1556,9 @@
 
     function renderPetrolLog() {
       const sorted = [...data.petrols].sort((a, b) => new Date(b.date) - new Date(a.date));
-      const totalL = sorted.reduce((s, p) => s + p.litres, 0);
-      const totalSpend = sorted.reduce((s, p) => s + p.amount, 0);
+      const totalL = round2(sorted.reduce((s, p) => s + p.litres, 0));
+      const totalSpend = round2(sorted.reduce((s, p) => s + p.amount, 0));
+      const mileageMap = getMileageMap();
 
       if (!sorted.length) {
         document.getElementById('petrol-table').innerHTML = '<div class="empty"><div class="e-icon">⛽</div>No petrol entries yet</div>';
@@ -1480,23 +1566,26 @@
       }
 
       let html = `<div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
-    <div class="stat-tile" style="flex:1;min-width:120px"><div class="num">${totalL.toFixed(1)} L</div><div class="desc">total litres</div></div>
-    <div class="stat-tile" style="flex:1;min-width:120px"><div class="num">₹${Math.round(totalSpend).toLocaleString()}</div><div class="desc">total spent</div></div>
+    <div class="stat-tile" style="flex:1;min-width:120px"><div class="num">${fmt2(totalL)} L</div><div class="desc">total litres</div></div>
+    <div class="stat-tile" style="flex:1;min-width:120px"><div class="num">₹${fmt2(totalSpend)}</div><div class="desc">total spent</div></div>
   </div>
-  <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Amount paid</th><th>Price/L</th><th>Litres added</th><th>Total litres</th><th></th></tr></thead><tbody>`;
+  <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Odometer</th><th>Amount paid</th><th>Price/L</th><th>Litres added</th><th>Total litres</th><th>Mileage</th><th></th></tr></thead><tbody>`;
 
       let cumulative = 0;
       const byDate = [...sorted].reverse();
-      byDate.forEach(p => { p._cum = (cumulative += p.litres); });
+      byDate.forEach(p => { p._cum = round2(cumulative += p.litres); });
 
       sorted.forEach(p => {
+        const mileage = mileageMap.has(mileageKey(p)) ? mileageMap.get(mileageKey(p)) : null;
         html += `<tr>
       <td class="primary">${fmtDate(p.date)}</td>
-      <td>₹${p.amount.toLocaleString()}</td>
-      <td>₹${p.price}/L</td>
-      <td><span class="badge badge-petrol">${p.litres.toFixed(2)} L</span></td>
-      <td style="color:var(--text2)">${(p._cum || 0).toFixed(2)} L</td>
-      <td><button class="del-btn" onclick="delPetrol('${p.date}',${p.amount})">✕</button></td>
+      <td>${typeof p.odo === 'number' ? fmt2(p.odo) + ' km' : '—'}</td>
+      <td>₹${fmt2(p.amount)}</td>
+      <td>₹${fmt2(p.price)}/L</td>
+      <td><span class="badge badge-petrol">${fmt2(p.litres)} L</span></td>
+      <td style="color:var(--text2)">${fmt2(p._cum || 0)} L</td>
+      <td>${mileage !== null ? `<span class="badge badge-ride">${fmt2(mileage)} km/L</span>` : '—'}</td>
+      <td><button class="del-btn" onclick="delPetrol('${p.date}',${p.amount},${typeof p.odo === 'number' ? p.odo : 'null'})">✕</button></td>
     </tr>`;
       });
       html += '</tbody></table></div>';
@@ -1514,7 +1603,7 @@
       sorted.forEach((o, i) => {
         html += `<tr>
       <td class="primary">${fmtDate(o.date)}${i === 0 ? ' <span class="badge badge-oil">Latest</span>' : ''}</td>
-      <td>${o.odo.toLocaleString()} km</td>
+      <td>${fmt2(o.odo)} km</td>
       <td style="color:var(--text2)">${o.notes || '—'}</td>
       <td><button class="del-btn" onclick="delOil('${o.date}',${o.odo})">✕</button></td>
     </tr>`;
@@ -1532,9 +1621,9 @@
       const rLast = rearChecks[0];
 
       document.getElementById('tyre-front-date').textContent = fLast ? `Last checked: ${fmtDate(fLast.date)}` : 'Never recorded';
-      document.getElementById('tyre-front-note').textContent = fLast ? (fLast.psi ? `${fLast.psi} PSI` + (fLast.notes ? ' · ' + fLast.notes : '') : fLast.notes || '') : '';
+      document.getElementById('tyre-front-note').textContent = fLast ? (fLast.psi ? `${fmt2(fLast.psi)} PSI` + (fLast.notes ? ' · ' + fLast.notes : '') : fLast.notes || '') : '';
       document.getElementById('tyre-rear-date').textContent = rLast ? `Last checked: ${fmtDate(rLast.date)}` : 'Never recorded';
-      document.getElementById('tyre-rear-note').textContent = rLast ? (rLast.psi ? `${rLast.psi} PSI` + (rLast.notes ? ' · ' + rLast.notes : '') : rLast.notes || '') : '';
+      document.getElementById('tyre-rear-note').textContent = rLast ? (rLast.psi ? `${fmt2(rLast.psi)} PSI` + (rLast.notes ? ' · ' + rLast.notes : '') : rLast.notes || '') : '';
 
       const sorted = [...data.tyreChecks].sort((a, b) => new Date(b.date) - new Date(a.date));
       if (!sorted.length) {
@@ -1546,7 +1635,7 @@
         html += `<tr>
       <td class="primary">${fmtDate(t.date)}</td>
       <td><span class="badge badge-tyre">${t.tyre.charAt(0).toUpperCase() + t.tyre.slice(1)}</span></td>
-      <td>${t.psi ? t.psi + ' PSI' : '—'}</td>
+      <td>${t.psi ? fmt2(t.psi) + ' PSI' : '—'}</td>
       <td style="color:var(--text2)">${t.notes || '—'}</td>
       <td><button class="del-btn" onclick="delTyre('${t.date}','${t.tyre}')">✕</button></td>
     </tr>`;
@@ -1557,7 +1646,7 @@
 
     function renderService() {
       const sorted = [...data.services].sort((a, b) => new Date(b.date) - new Date(a.date));
-      const totalCost = sorted.reduce((s, sv) => s + (sv.cost || 0), 0);
+      const totalCost = round2(sorted.reduce((s, sv) => s + (sv.cost || 0), 0));
 
       if (!sorted.length) {
         document.getElementById('service-list').innerHTML = '<div class="empty"><div class="e-icon">🛠️</div>No service records yet</div>';
@@ -1567,7 +1656,7 @@
       let html = '';
       if (totalCost > 0) {
         html += `<div style="display:flex;gap:1rem;margin-bottom:1rem">
-      <div class="stat-tile" style="flex:1"><div class="num">₹${Math.round(totalCost).toLocaleString()}</div><div class="desc">total service cost</div></div>
+      <div class="stat-tile" style="flex:1"><div class="num">₹${fmt2(totalCost)}</div><div class="desc">total service cost</div></div>
       <div class="stat-tile" style="flex:1"><div class="num">${sorted.length}</div><div class="desc">service records</div></div>
     </div>`;
       }
@@ -1580,8 +1669,8 @@
         <div class="service-title">${sv.title} ${isRecent ? '<span class="badge badge-service">Latest</span>' : ''}</div>
         <div class="service-meta">
           ${fmtDate(sv.date)}
-          ${sv.odo ? `<span class="sep">·</span>${sv.odo.toLocaleString()} km` : ''}
-          ${sv.cost ? `<span class="sep">·</span>₹${sv.cost.toLocaleString()}` : ''}
+          ${sv.odo ? `<span class="sep">·</span>${fmt2(sv.odo)} km` : ''}
+          ${sv.cost ? `<span class="sep">·</span>₹${fmt2(sv.cost)}` : ''}
           ${sv.shop ? `<span class="sep">·</span>${sv.shop}` : ''}
         </div>
         ${sv.notes ? `<div class="service-desc">${sv.notes}</div>` : ''}
@@ -1596,24 +1685,26 @@
     //  OVERALL CHARTS
     // ═══════════════════════════════════
     function renderOverall() {
-      const totalKm = getTotalOdo() - (data.initialOdo || 0);
-      const totalL = data.petrols.reduce((s, p) => s + p.litres, 0);
-      const totalSpend = data.petrols.reduce((s, p) => s + p.amount, 0);
-      const avg = totalL > 0 && totalKm > 0 ? (totalKm / totalL).toFixed(1) : '—';
+      const totalKm = round2(getTotalOdo() - (data.initialOdo || 0));
+      const totalL = round2(data.petrols.reduce((s, p) => s + p.litres, 0));
+      const totalSpend = round2(data.petrols.reduce((s, p) => s + p.amount, 0));
+      const avgMileage = getOverallAvgMileage();
+      const maxMileage = getOverallMaxMileage();
 
-      document.getElementById('ov-km').textContent = Math.round(totalKm).toLocaleString() + ' km';
-      document.getElementById('ov-litres').textContent = totalL.toFixed(1) + ' L';
-      document.getElementById('ov-spend').textContent = '₹' + Math.round(totalSpend).toLocaleString();
-      document.getElementById('ov-avg').textContent = avg === '—' ? '—' : avg + ' km/L';
+      document.getElementById('ov-km').textContent = fmt2(totalKm) + ' km';
+      document.getElementById('ov-litres').textContent = fmt2(totalL) + ' L';
+      document.getElementById('ov-spend').textContent = '₹' + fmt2(totalSpend);
+      document.getElementById('ov-avg').textContent = avgMileage === null ? '—' : fmt2(avgMileage) + ' km/L';
+      document.getElementById('ov-max-mileage').textContent = maxMileage === null ? '—' : fmt2(maxMileage) + ' km/L';
 
       const months = getAllMonths().reverse();
       const labels = months.map(m => {
         const [y, mo] = m.split('-');
         return new Date(y, parseInt(mo) - 1, 1).toLocaleString('default', { month: 'short', year: '2-digit' });
       });
-      const kmData = months.map(m => getMonthKm(m));
-      const petrolData = months.map(m => parseFloat(getMonthLitres(m).toFixed(2)));
-      const spendData = months.map(m => Math.round(getMonthSpend(m)));
+      const kmData = months.map(m => round2(getMonthKm(m)));
+      const petrolData = months.map(m => round2(getMonthLitres(m)));
+      const spendData = months.map(m => round2(getMonthSpend(m)));
 
       const baseOpts = {
         responsive: true, maintainAspectRatio: false,
@@ -1628,21 +1719,21 @@
       chartKm = new Chart(document.getElementById('chart-km'), {
         type: 'bar',
         data: { labels, datasets: [{ data: kmData, backgroundColor: '#4a9eff', borderRadius: 4, borderSkipped: 'bottom' }] },
-        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => v + ' km' } } } }
+        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => fmt2(v) + ' km' } } } }
       });
 
       if (chartPetrol) chartPetrol.destroy();
       chartPetrol = new Chart(document.getElementById('chart-petrol'), {
         type: 'bar',
         data: { labels, datasets: [{ data: petrolData, backgroundColor: '#f0b429', borderRadius: 4, borderSkipped: 'bottom' }] },
-        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => v + ' L' } } } }
+        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => fmt2(v) + ' L' } } } }
       });
 
       if (chartSpend) chartSpend.destroy();
       chartSpend = new Chart(document.getElementById('chart-spend'), {
         type: 'bar',
         data: { labels, datasets: [{ data: spendData, backgroundColor: '#e86c2f', borderRadius: 4, borderSkipped: 'bottom' }] },
-        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => '₹' + v } } } }
+        options: { ...JSON.parse(JSON.stringify(baseOpts)), scales: { ...JSON.parse(JSON.stringify(baseOpts.scales)), y: { ...JSON.parse(JSON.stringify(baseOpts.scales.y)), ticks: { color: '#5e5c58', font: { size: 11 }, callback: v => '₹' + fmt2(v) } } } }
       });
     }
 
@@ -1655,9 +1746,9 @@
       saveLocal(); renderRides(); renderDashboard();
       toast('Ride deleted');
     }
-    function delPetrol(date, amount) {
+    function delPetrol(date, amount, odo) {
       if (!confirm(`Delete petrol entry on ${fmtDate(date)}?`)) return;
-      data.petrols = data.petrols.filter(p => !(p.date === date && p.amount === amount));
+      data.petrols = data.petrols.filter(p => !(p.date === date && p.amount === amount && (odo === null || p.odo === odo)));
       saveLocal(); renderPetrolLog(); renderDashboard();
       toast('Entry deleted');
     }
@@ -1714,7 +1805,7 @@
       setTodayDefaults();
       populateMonthSelector();
       renderDashboard();
-      document.getElementById('sidebar-odo').textContent = getTotalOdo().toLocaleString() + ' km on clock';
+      document.getElementById('sidebar-odo').textContent = fmt2(getTotalOdo()) + ' km on clock';
     }
 
     init();
