@@ -405,5 +405,14 @@
     }
   ],
   "tyreChecks": [],
-  "services": []
+  "services": [
+    {
+      "date": "2026-08-01",
+      "odo": 87011.2,
+      "cost": 1500,
+      "title": "Full Service",
+      "notes": "",
+      "shop": "TVS Showroom"
+    }
+  ]
 }
